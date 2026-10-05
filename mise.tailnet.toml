@@ -1,0 +1,12 @@
+# Settings for testing on a phone or another device over Tailscale. They apply when MISE_ENV is
+# `tailnet`, which `mise run dev:tailnet` sets. Values come from `tailscale`, so they match the
+# machine this runs on, and they override PUBLIC_URL and OIDC_ISSUER_URL from .env.
+
+[env]
+TAILNET_HOST = "{{ exec(command='tailscale status --json | jq -r .Self.DNSName') | trim | trim_end(pat='.') }}"
+TAILNET_IP = "{{ exec(command='tailscale ip -4') | trim }}"
+PUBLIC_URL = "http://{{ env.TAILNET_HOST }}:5173"
+OIDC_ISSUER_URL = "http://{{ env.TAILNET_HOST }}:5556/dex"
+VITE_HOST = "{{ env.TAILNET_IP }}"
+VITE_ALLOWED_HOSTS = "{{ env.TAILNET_HOST }}"
+DEX_BIND = "{{ env.TAILNET_IP }}"

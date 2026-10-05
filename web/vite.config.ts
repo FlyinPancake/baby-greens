@@ -13,7 +13,10 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: {
-    // The Dex redirect URI in dev/dex.yaml expects this port.
+    // Tailnet mode (`mise run dev:tailnet`) sets these to reach the dev server from a phone.
+    host: process.env.VITE_HOST ?? 'localhost',
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS?.split(',') ?? [],
+    // PUBLIC_URL and the Dex redirect URI expect this port.
     port: 5173,
     strictPort: true,
     // Playwright writes into these while tests run. A change there must not reload open pages.

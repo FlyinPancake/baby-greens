@@ -47,6 +47,10 @@ description = "Run the Vite dev server on http://localhost:5173"
 dir = "web"
 run = "bun run dev"
 
+[tasks."dev:tailnet"]
+description = "Run the dev stack on this machine's Tailscale name, to test from a phone"
+run = ["MISE_ENV=tailnet mise run up", "MISE_ENV=tailnet mise run dev"]
+
 [tasks."build:web"]
 description = "Build the frontend into web/dist"
 dir = "web"

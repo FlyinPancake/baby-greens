@@ -1,4 +1,6 @@
-issuer: http://localhost:5556/dex
+# Rendered by the Dex image's entrypoint (gomplate). compose.yaml passes the variables, so the
+# same file works on localhost and on the tailnet (`mise run dev:tailnet`).
+issuer: {{ getenv "DEX_ISSUER" "http://localhost:5556/dex" }}
 
 storage:
   type: memory
@@ -15,7 +17,7 @@ staticClients:
     name: baby-greens
     secret: dev-client-secret
     redirectURIs:
-      - http://localhost:5173/auth/callback
+      - {{ getenv "PUBLIC_URL" "http://localhost:5173" }}/auth/callback
 
 enablePasswordDB: true
 

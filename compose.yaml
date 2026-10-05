@@ -17,13 +17,18 @@ services:
       retries: 15
 
   # Stand-in OIDC provider. Log in as grower@example.com with the password "password".
+  # The issuer and redirect URI follow OIDC_ISSUER_URL and PUBLIC_URL from .env, which tailnet
+  # mode overrides. DEX_BIND picks the address the port listens on.
   dex:
     image: ghcr.io/dexidp/dex:v2.45.1
-    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    command: ["dex", "serve", "/etc/dex/config.yaml.tpl"]
+    environment:
+      DEX_ISSUER: ${OIDC_ISSUER_URL:-http://localhost:5556/dex}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:5173}
     ports:
-      - "127.0.0.1:5556:5556"
+      - "${DEX_BIND:-127.0.0.1}:5556:5556"
     volumes:
-      - ./dev/dex.yaml:/etc/dex/config.yaml:ro,z
+      - ./dev/dex.yaml.tpl:/etc/dex/config.yaml.tpl:ro,z
 
 volumes:
   postgres-data:
