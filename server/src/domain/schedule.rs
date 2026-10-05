@@ -35,6 +35,20 @@ impl TaskAction {
         }
     }
 
+    /// What the person should do, like "Rinse and drain". Matches the web app's wording.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Advance(StepAction::Soak) => "Start soaking",
+            Self::Advance(StepAction::Sprout) => "Drain the soak water",
+            Self::Advance(StepAction::Blackout) => "Sow and cover",
+            Self::Advance(StepAction::Light) => "Uncover and move into light",
+            Self::Advance(StepAction::Harvest) => "Harvest",
+            Self::Care(CareAction::Rinse) => "Rinse and drain",
+            Self::Care(CareAction::Water) => "Water",
+            Self::Care(CareAction::Mist) => "Mist",
+        }
+    }
+
     /// The inverse of [`kind`](Self::kind) and [`action`](Self::action).
     pub fn from_parts(kind: &str, action: &str) -> Option<Self> {
         match kind {

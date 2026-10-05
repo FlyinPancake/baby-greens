@@ -4,6 +4,7 @@ import { CalendarCheck, Plus, Sprout } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { BatchCard } from '@/components/BatchCard'
 import { EmptyState } from '@/components/EmptyState'
+import { ReminderNudge } from '@/components/ReminderNudge'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { Highlight } from '@/components/PageHeading'
 import { TaskCard } from '@/components/TaskCard'
@@ -54,6 +55,8 @@ function Today() {
           />
         </div>
       </section>
+
+      <ReminderNudge />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-2xl">Today</h2>

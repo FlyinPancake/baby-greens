@@ -68,6 +68,10 @@ dir = "server"
 usage = 'arg "<name>" help="Migration name, like add_seed_stock"'
 run = 'sqlx migrate add "${usage_name?}"'
 
+[tasks."vapid:key"]
+description = "Print a new VAPID private key for VAPID_PRIVATE_KEY in .env"
+run = "cargo run -q --manifest-path server/Cargo.toml -- vapid-key"
+
 [tasks."db:reset"]
 description = "Drop, recreate, and migrate the dev database"
 dir = "server"

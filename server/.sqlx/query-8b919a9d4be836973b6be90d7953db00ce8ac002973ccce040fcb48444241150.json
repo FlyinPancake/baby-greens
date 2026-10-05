@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT t.id, t.kind::text AS \"kind!\", t.action, b.id AS batch_id,\n               b.plant ->> 'name' AS \"plant_name!\", c.name AS container,\n               u.id AS user_id, u.timezone, u.quiet_start, u.quiet_end\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        JOIN containers c ON c.id = b.container_id\n        JOIN users u ON u.id = b.user_id\n        WHERE t.done_at IS NULL\n          AND t.notified_at IS NULL\n          AND b.status = 'active'\n          AND coalesce(t.snoozed_until, t.due_at) <= $1\n        ORDER BY coalesce(t.snoozed_until, t.due_at), t.id\n        FOR UPDATE OF t SKIP LOCKED\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "action",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "plant_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "container",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "timezone",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "quiet_start",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 9,
+        "name": "quiet_end",
+        "type_info": "Time"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "8b919a9d4be836973b6be90d7953db00ce8ac002973ccce040fcb48444241150"
+}

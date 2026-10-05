@@ -62,6 +62,11 @@ flows, plus that no page scrolls sideways at desktop, 375 px, and 320 px widths.
 Dex up. The tests reuse `mise run dev` if it's running and start it if not. Batches they create are
 discarded, so they stay in that user's history.
 
+Reminders need a VAPID key. Run `mise run vapid:key` and put the result in `.env` as
+`VAPID_PRIVATE_KEY`. Without one the server runs with push off. Headless Chromium has no push
+service, so the browser tests don't cover delivery; the Rust tests cover the job with a fake
+notifier.
+
 Run `mise tasks` to list the other tasks, such as `check`, `test`, `migrate:add`, and `db:reset`.
 
 ## Dev login

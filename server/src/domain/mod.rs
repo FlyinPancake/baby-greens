@@ -2,5 +2,6 @@
 
 pub mod library;
 pub mod plant;
+pub mod quiet;
 pub mod schedule;
 pub mod span;

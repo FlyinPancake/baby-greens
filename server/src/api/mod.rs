@@ -1,10 +1,12 @@
 //! The JSON API, served under `/api/v1`. Every handler is registered through utoipa-axum, so
 //! the router and the OpenAPI spec come from the same list.
 
+mod account;
 mod batches;
 mod containers;
 mod extract;
 mod plants;
+mod push;
 mod tasks;
 
 use axum::{Router, extract::State, http::StatusCode, routing::get};
@@ -16,16 +18,11 @@ use utoipa::{
         security::{ApiKey, ApiKeyValue, SecurityScheme},
     },
 };
-use utoipa_axum::{router::OpenApiRouter, routes};
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable};
 
 use self::extract::Json;
-use crate::{
-    AppState,
-    auth::AuthUser,
-    db::users::User,
-    error::{AppError, ErrorBody},
-};
+use crate::{AppState, error::AppError};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -38,6 +35,7 @@ use crate::{
         (name = "batches", description = "What you're growing"),
         (name = "containers", description = "Jars and trays, shared by the household"),
         (name = "tasks", description = "Chores and step changes"),
+        (name = "push", description = "Reminders on your devices"),
     ),
 )]
 struct ApiDoc;
@@ -57,11 +55,12 @@ impl Modify for SessionCookie {
 
 fn v1() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .routes(routes!(me))
+        .merge(account::router())
         .merge(plants::router())
         .merge(batches::router())
         .merge(containers::router())
         .merge(tasks::router())
+        .merge(push::router())
 }
 
 /// The OpenAPI spec for `/api/v1`.
@@ -105,21 +104,6 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<Health>) {
     }
 }
 
-/// The signed-in user.
-#[utoipa::path(
-    get,
-    path = "/me",
-    tag = "account",
-    security(("session" = [])),
-    responses(
-        (status = 200, body = User),
-        (status = 401, body = ErrorBody),
-    ),
-)]
-async fn me(AuthUser(user): AuthUser) -> Json<User> {
-    Json(user)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,8 +124,12 @@ mod tests {
                 "/me",
                 "/plants",
                 "/plants/{slug}",
+                "/push/key",
+                "/push/subscriptions",
+                "/push/test",
                 "/tasks",
                 "/tasks/{id}/complete",
+                "/tasks/{id}/snooze",
             ]
         );
     }

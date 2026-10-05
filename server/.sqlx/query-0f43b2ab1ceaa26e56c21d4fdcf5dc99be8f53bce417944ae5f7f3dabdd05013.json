@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE users SET\n            timezone = coalesce($2, timezone),\n            quiet_start = CASE WHEN $3 THEN NULL ELSE coalesce($4, quiet_start) END,\n            quiet_end = CASE WHEN $3 THEN NULL ELSE coalesce($5, quiet_end) END\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Time",
+        "Time"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0f43b2ab1ceaa26e56c21d4fdcf5dc99be8f53bce417944ae5f7f3dabdd05013"
+}

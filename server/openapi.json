@@ -582,6 +582,66 @@
             "session": []
           }
         ]
+      },
+      "patch": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Change your timezone or quiet hours.",
+        "operationId": "update_me",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
       }
     },
     "/plants": {
@@ -791,6 +851,175 @@
         ]
       }
     },
+    "/push/key": {
+      "get": {
+        "tags": [
+          "push"
+        ],
+        "operationId": "push_key",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushKey"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/push/subscriptions": {
+      "post": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Save this device's push subscription, so reminders reach it.",
+        "operationId": "subscribe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Stop sending reminders to this device.",
+        "operationId": "unsubscribe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnsubscribeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Removed, or it wasn't saved"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/push/test": {
+      "post": {
+        "tags": [
+          "push"
+        ],
+        "summary": "Send a test notification to all of your devices.",
+        "operationId": "send_test",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Push notifications are off on this server (`push_disabled`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/tasks": {
       "get": {
         "tags": [
@@ -891,6 +1120,93 @@
           },
           "409": {
             "description": "The task is already done (`task_done`), or its batch has moved on (`batch_not_active`, `stale_task`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/tasks/{id}/snooze": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Push a task back. You get a new reminder when the snooze ends.",
+        "operationId": "snooze_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Snoozed"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task is done or its batch has ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The time is in the past or more than a week away",
             "content": {
               "application/json": {
                 "schema": {
@@ -1319,12 +1635,56 @@
           }
         }
       },
+      "PushKey": {
+        "type": "object",
+        "properties": {
+          "public_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The VAPID public key, as base64url, for `pushManager.subscribe`. Null when push\nnotifications are off on this server."
+          }
+        }
+      },
+      "QuietHours": {
+        "type": "object",
+        "description": "Quiet hours in a user's local time. `end` before `start` means they run past midnight.",
+        "required": [
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string",
+            "example": "07:00"
+          },
+          "start": {
+            "type": "string",
+            "example": "22:00"
+          }
+        }
+      },
       "Slug": {
         "type": "string",
         "description": "A plant's id, like `mung-bean`. Lowercase letters, digits, and single hyphens, at most 64\ncharacters.",
         "example": "mung-bean",
         "maxLength": 64,
         "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "SnoozeTask": {
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When to remind you again. Within the next week."
+          }
+        },
+        "additionalProperties": false
       },
       "Source": {
         "type": "string",
@@ -1440,6 +1800,37 @@
           }
         }
       },
+      "SubscriptionBody": {
+        "type": "object",
+        "description": "The JSON a browser's `PushSubscription.toJSON()` gives.",
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/SubscriptionKeys"
+          }
+        }
+      },
+      "SubscriptionKeys": {
+        "type": "object",
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "properties": {
+          "auth": {
+            "type": "string"
+          },
+          "p256dh": {
+            "type": "string"
+          }
+        }
+      },
       "TaskAction": {
         "oneOf": [
           {
@@ -1524,6 +1915,14 @@
               "plant_name": {
                 "type": "string"
               },
+              "snoozed_until": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "Set while the task is snoozed. `due_at` already counts the snooze."
+              },
               "step_index": {
                 "type": "integer",
                 "minimum": 0
@@ -1531,6 +1930,36 @@
             }
           }
         ]
+      },
+      "TestResult": {
+        "type": "object",
+        "required": [
+          "sent",
+          "removed"
+        ],
+        "properties": {
+          "removed": {
+            "type": "integer",
+            "description": "Subscriptions removed because the push service no longer knows them.",
+            "minimum": 0
+          },
+          "sent": {
+            "type": "integer",
+            "description": "Devices the push service accepted the message for.",
+            "minimum": 0
+          }
+        }
+      },
+      "UnsubscribeBody": {
+        "type": "object",
+        "required": [
+          "endpoint"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          }
+        }
       },
       "UpdateContainer": {
         "type": "object",
@@ -1568,6 +1997,30 @@
         },
         "additionalProperties": false
       },
+      "UpdateMe": {
+        "type": "object",
+        "description": "Settings to change. Leave a field out to keep it. Send `\"quiet_hours\": null` to turn quiet\nhours off.",
+        "properties": {
+          "quiet_hours": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuietHours"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An IANA timezone, like `Europe/Budapest`."
+          }
+        },
+        "additionalProperties": false
+      },
       "User": {
         "type": "object",
         "required": [
@@ -1589,8 +2042,20 @@
             "type": "string",
             "format": "uuid"
           },
+          "quiet_hours": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuietHours",
+                "description": "When reminders wait, in local time. None means they can arrive any time."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "timezone": {
-            "type": "string"
+            "type": "string",
+            "description": "An IANA timezone, like `Europe/Budapest`. Quiet hours and \"today\" follow it."
           }
         }
       }
@@ -1623,6 +2088,10 @@
     {
       "name": "tasks",
       "description": "Chores and step changes"
+    },
+    {
+      "name": "push",
+      "description": "Reminders on your devices"
     }
   ]
 }

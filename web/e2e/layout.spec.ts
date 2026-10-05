@@ -21,6 +21,7 @@ const pages = [
   { path: '/plants/e2e-new-plant', ready: 'This slug is free' },
   { path: '/batches/new', ready: 'Pick a plant' },
   { path: '/containers', ready: 'Add a jar or tray' },
+  { path: '/settings', ready: 'Reminder schedule' },
 ]
 
 for (const { path, ready } of pages) {

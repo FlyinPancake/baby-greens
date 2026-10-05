@@ -62,6 +62,11 @@ test('start a batch, advance it, and discard it', async ({ page }, testInfo) => 
   await expect(page.getByRole('button', { name: 'Mark "Rinse and drain" done' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Mark "Harvest" done' })).toBeVisible()
 
+  // Snoozing the rinse pushes it back and says so.
+  await page.getByRole('button', { name: 'Snooze "Rinse and drain"' }).click()
+  await page.getByRole('group', { name: 'Snooze for' }).getByRole('button', { name: '3 hours' }).click()
+  await expect(page.getByText(/^snoozed until /)).toBeVisible()
+
   // The container page shows the jar as busy.
   await page.getByRole('link', { name: jar }).click()
   await expect(page.getByRole('heading', { name: jar })).toBeVisible()

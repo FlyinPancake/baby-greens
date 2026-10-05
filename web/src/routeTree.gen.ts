@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as BatchesIdRouteImport } from './routes/batches.$id'
 import { Route as BatchesNewRouteImport } from './routes/batches.new'
 import { Route as ContainersIndexRouteImport } from './routes/containers.index'
@@ -20,6 +21,11 @@ import { Route as PlantsSlugRouteImport } from './routes/plants.$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BatchesIdRoute = BatchesIdRouteImport.update({
@@ -55,6 +61,7 @@ const PlantsSlugRoute = PlantsSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/batches/$id': typeof BatchesIdRoute
   '/batches/new': typeof BatchesNewRoute
   '/containers/$id': typeof ContainersIdRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/batches/$id': typeof BatchesIdRoute
   '/batches/new': typeof BatchesNewRoute
   '/containers/$id': typeof ContainersIdRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRoute
   '/batches/$id': typeof BatchesIdRoute
   '/batches/new': typeof BatchesNewRoute
   '/containers/$id': typeof ContainersIdRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/settings'
     | '/batches/$id'
     | '/batches/new'
     | '/containers/$id'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/settings'
     | '/batches/$id'
     | '/batches/new'
     | '/containers/$id'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/settings'
     | '/batches/$id'
     | '/batches/new'
     | '/containers/$id'
@@ -113,6 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRoute: typeof SettingsRoute
   BatchesIdRoute: typeof BatchesIdRoute
   BatchesNewRoute: typeof BatchesNewRoute
   ContainersIdRoute: typeof ContainersIdRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/batches/$id': {
@@ -177,6 +197,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SettingsRoute: SettingsRoute,
   BatchesIdRoute: BatchesIdRoute,
   BatchesNewRoute: BatchesNewRoute,
   ContainersIdRoute: ContainersIdRoute,

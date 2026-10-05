@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tasks SET notified_at = $2 WHERE id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d52be86c77e80f4a8fe792ed113f114326e180fdb1d79e725e7a779a4d2ac59f"
+}

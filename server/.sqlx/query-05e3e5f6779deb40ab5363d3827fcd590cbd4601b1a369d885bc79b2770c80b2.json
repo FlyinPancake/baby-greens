@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, display_name, email, timezone FROM users WHERE id = $1",
+  "query": "SELECT id, display_name, email, timezone, quiet_start, quiet_end FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -22,6 +22,16 @@
         "ordinal": 3,
         "name": "timezone",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "quiet_start",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 5,
+        "name": "quiet_end",
+        "type_info": "Time"
       }
     ],
     "parameters": {
@@ -33,8 +43,10 @@
       false,
       false,
       true,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "52cc37e84cb2db64c60cc06aab27a46e240a43fb158d8d34ac9365f71c42b134"
+  "hash": "05e3e5f6779deb40ab5363d3827fcd590cbd4601b1a369d885bc79b2770c80b2"
 }

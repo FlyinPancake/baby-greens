@@ -108,7 +108,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Change your timezone or quiet hours. */
+        patch: operations["update_me"];
         trace?: never;
     };
     "/plants": {
@@ -152,6 +153,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/push/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["push_key"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save this device's push subscription, so reminders reach it. */
+        post: operations["subscribe"];
+        /** Stop sending reminders to this device. */
+        delete: operations["unsubscribe"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/push/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test notification to all of your devices. */
+        post: operations["send_test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -183,6 +235,23 @@ export interface paths {
          *     moves the batch into its next step, and moving into harvest ends the batch.
          */
         post: operations["complete_task"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Push a task back. You get a new reminder when the snooze ends. */
+        post: operations["snooze_task"];
         delete?: never;
         options?: never;
         head?: never;
@@ -326,12 +395,33 @@ export interface components {
             message: string;
             path: string;
         };
+        PushKey: {
+            /**
+             * @description The VAPID public key, as base64url, for `pushManager.subscribe`. Null when push
+             *     notifications are off on this server.
+             */
+            public_key?: string | null;
+        };
+        /** @description Quiet hours in a user's local time. `end` before `start` means they run past midnight. */
+        QuietHours: {
+            /** @example 07:00 */
+            end: string;
+            /** @example 22:00 */
+            start: string;
+        };
         /**
          * @description A plant's id, like `mung-bean`. Lowercase letters, digits, and single hyphens, at most 64
          *     characters.
          * @example mung-bean
          */
         Slug: string;
+        SnoozeTask: {
+            /**
+             * Format: date-time
+             * @description When to remind you again. Within the next week.
+             */
+            until: string;
+        };
         /** @enum {string} */
         Source: "builtin" | "custom" | "override";
         Step: {
@@ -369,6 +459,15 @@ export interface components {
             latest_start: string;
             step_index: number;
         };
+        /** @description The JSON a browser's `PushSubscription.toJSON()` gives. */
+        SubscriptionBody: {
+            endpoint: string;
+            keys: components["schemas"]["SubscriptionKeys"];
+        };
+        SubscriptionKeys: {
+            auth: string;
+            p256dh: string;
+        };
         /** @description Serializes as `{ "kind": "advance", "action": "light" }` or `{ "kind": "care", "action": "rinse" }`. */
         TaskAction: {
             /** @description Move the batch into the next step, whose action this is. */
@@ -391,7 +490,21 @@ export interface components {
             /** Format: date-time */
             overdue_at?: string | null;
             plant_name: string;
+            /**
+             * Format: date-time
+             * @description Set while the task is snoozed. `due_at` already counts the snooze.
+             */
+            snoozed_until?: string | null;
             step_index: number;
+        };
+        TestResult: {
+            /** @description Subscriptions removed because the push service no longer knows them. */
+            removed: number;
+            /** @description Devices the push service accepted the message for. */
+            sent: number;
+        };
+        UnsubscribeBody: {
+            endpoint: string;
         };
         /** @description Fields to change. Leave a field out to keep it. */
         UpdateContainer: {
@@ -401,11 +514,22 @@ export interface components {
             name?: string | null;
             notes?: string | null;
         };
+        /**
+         * @description Settings to change. Leave a field out to keep it. Send `"quiet_hours": null` to turn quiet
+         *     hours off.
+         */
+        UpdateMe: {
+            quiet_hours?: components["schemas"]["QuietHours"] | null;
+            /** @description An IANA timezone, like `Europe/Budapest`. */
+            timezone?: string | null;
+        };
         User: {
             display_name: string;
             email?: string | null;
             /** Format: uuid */
             id: string;
+            quiet_hours?: components["schemas"]["QuietHours"] | null;
+            /** @description An IANA timezone, like `Europe/Budapest`. Quiet hours and "today" follow it. */
             timezone: string;
         };
     };
@@ -837,6 +961,53 @@ export interface operations {
             };
         };
     };
+    update_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMe"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_plants: {
         parameters: {
             query?: never;
@@ -989,6 +1160,145 @@ export interface operations {
             };
         };
     };
+    push_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushKey"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    subscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionBody"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    unsubscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnsubscribeBody"];
+            };
+        };
+        responses: {
+            /** @description Removed, or it wasn't saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    send_test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResult"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Push notifications are off on this server (`push_disabled`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_tasks: {
         parameters: {
             query?: {
@@ -1063,6 +1373,72 @@ export interface operations {
             };
             /** @description The task is already done (`task_done`), or its batch has moved on (`batch_not_active`, `stale_task`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    snooze_task: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnoozeTask"];
+            };
+        };
+        responses: {
+            /** @description Snoozed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The task is done or its batch has ended */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The time is in the past or more than a week away */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

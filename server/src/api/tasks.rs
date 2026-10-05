@@ -1,7 +1,7 @@
 use axum::{extract::State, http::StatusCode};
 use serde::Deserialize;
 use time::OffsetDateTime;
-use utoipa::IntoParams;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
@@ -17,6 +17,43 @@ pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(list_tasks))
         .routes(routes!(complete_task))
+        .routes(routes!(snooze_task))
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+struct SnoozeTask {
+    /// When to remind you again. Within the next week.
+    #[serde(with = "time::serde::rfc3339")]
+    until: OffsetDateTime,
+}
+
+/// Push a task back. You get a new reminder when the snooze ends.
+#[utoipa::path(
+    post,
+    path = "/tasks/{id}/snooze",
+    tag = "tasks",
+    security(("session" = [])),
+    params(("id" = Uuid, Path)),
+    request_body = SnoozeTask,
+    responses(
+        (status = 204, description = "Snoozed"),
+        (status = 400, body = ErrorBody),
+        (status = 401, body = ErrorBody),
+        (status = 404, body = ErrorBody),
+        (status = 409, description = "The task is done or its batch has ended", body = ErrorBody),
+        (status = 422, description = "The time is in the past or more than a week away", body = ErrorBody),
+    ),
+)]
+async fn snooze_task(
+    State(state): State<AppState>,
+    AuthUser(user): AuthUser,
+    Path(id): Path<Uuid>,
+    Json(request): Json<SnoozeTask>,
+) -> Result<StatusCode, AppError> {
+    let now = OffsetDateTime::now_utc();
+    batches::snooze_task(&state.pool, user.id, id, request.until, now).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize, IntoParams)]

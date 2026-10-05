@@ -77,7 +77,7 @@ The JSON API lives under `/api/v1`, so a future native app can stay on `v1` whil
 
 | Method | Path | What it does |
 | --- | --- | --- |
-| GET | `/me` | The signed-in user |
+| GET, PATCH | `/me` | The signed-in user. PATCH sets the timezone and quiet hours |
 | GET | `/plants` | The library, with each plant's source: `builtin`, `custom`, or `override` |
 | GET, PUT, DELETE | `/plants/{slug}` | Read, save, or delete a custom plant. PUT validates first |
 | GET, POST | `/batches` | List batches (optionally by status or container), or start one |
@@ -87,6 +87,10 @@ The JSON API lives under `/api/v1`, so a future native app can stay on `v1` whil
 | GET, PATCH, DELETE | `/containers/{id}` | Read, rename, archive, or restore one. DELETE only works without history |
 | GET | `/tasks?due_before=` | Open tasks on active batches, soonest first |
 | POST | `/tasks/{id}/complete` | Finish a care chore, or advance the batch for an advance task |
+| POST | `/tasks/{id}/snooze` | Push a task back, up to a week. It gets a new reminder when the snooze ends |
+| GET | `/push/key` | The VAPID public key, or null when push is off |
+| POST, DELETE | `/push/subscriptions` | Save or forget this device's push subscription |
+| POST | `/push/test` | Send a test notification to all of your devices |
 
 Errors share one body: `{ "error": "<code>", "message"?: "...", "problems"?: [...] }`. Validation
 failures are 422 with `problems`, unreadable bodies are 400, and state conflicts such as finishing a
@@ -96,6 +100,23 @@ Every handler goes through `utoipa_axum::routes!`, so a route can't exist withou
 `baby-greens-server openapi` prints the spec without a database. `mise run api:gen` writes it to
 `server/openapi.json` and regenerates `web/src/lib/api.gen.ts`, and `mise run check` fails when
 either is out of date.
+
+## Reminders
+
+The server sends Web Push messages signed with a VAPID key from `VAPID_PRIVATE_KEY`. Without it,
+push stays off and the rest of the app works the same. `mise run vapid:key` prints a new key.
+
+A job in the server process runs every minute. In one transaction it claims open tasks on active
+batches that are due (counting snoozes) and not yet notified, using `FOR UPDATE SKIP LOCKED`. It
+skips people inside their quiet hours, which use their timezone and may run past midnight, and marks
+the rest as notified. Then it sends each person one message for all of their due tasks: one task
+names the step and opens its batch, several become a list that opens today. A push service answering
+404 or 410 removes the subscription. Tasks count as notified even for people without devices, so
+turning push on later doesn't replay old reminders. Snoozing clears the notified mark.
+
+The service worker (`web/src/sw.ts`) precaches the app, shows pushed messages, and opens the right
+page when one is tapped. Push needs a secure context, so it works on localhost and over https, but
+not over plain http on the tailnet.
 
 ## Authentication
 
@@ -276,7 +297,7 @@ server only depends on standard OIDC, so the dev setup doesn't need to match pro
    scheduling logic with tests.
 4. Plant, batch, and task API with utoipa-axum under `/api/v1`, the generated TypeScript client, the
    today view, batch pages, and a JSON editor for plants.
-5. PWA install, push subscription, the scheduler, snoozing, and quiet hours.
+5. PWA install, push subscription, the scheduler, snoozing, and quiet hours. See "Reminders".
 6. Offline support (saved Query cache, queued mutations, replay after re-login) and the harvest log
    with yield stats.
 7. Deploy behind Tailscale or Caddy against the real provider.

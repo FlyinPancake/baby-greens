@@ -1,7 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use baby_greens_server::{AppState, api, app, auth::AuthState, config::Config, domain::library};
+use baby_greens_server::{
+    AppState, api, app, auth::AuthState, config::Config, domain::library, jobs, notify::WebPush,
+};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_sessions::ExpiredDeletion;
@@ -11,9 +13,17 @@ use tracing_subscriber::EnvFilter;
 #[tokio::main]
 async fn main() -> Result<()> {
     // `baby-greens-server openapi` prints the API spec and exits, without a database or config.
-    if std::env::args().nth(1).as_deref() == Some("openapi") {
-        println!("{}", api::openapi().to_pretty_json()?);
-        return Ok(());
+    // `baby-greens-server vapid-key` prints a new VAPID private key for VAPID_PRIVATE_KEY.
+    match std::env::args().nth(1).as_deref() {
+        Some("openapi") => {
+            println!("{}", api::openapi().to_pretty_json()?);
+            return Ok(());
+        }
+        Some("vapid-key") => {
+            println!("{}", WebPush::generate_private_key());
+            return Ok(());
+        }
+        _ => {}
     }
 
     dotenvy::dotenv().ok();
@@ -57,9 +67,24 @@ async fn main() -> Result<()> {
     );
 
     let auth = AuthState::new(&config.oidc, &config.public_url).await?;
+    let push = config
+        .push
+        .as_ref()
+        .map(WebPush::new)
+        .transpose()?
+        .map(Arc::new);
+    match &push {
+        Some(push) => {
+            tokio::spawn(jobs::reminders::run(pool.clone(), push.clone()));
+            tracing::info!("push notifications are on");
+        }
+        None => tracing::warn!("push notifications are off; set VAPID_PRIVATE_KEY to turn them on"),
+    }
+
     let state = AppState {
         pool,
         auth: Arc::new(auth),
+        push,
     };
 
     let app = app(state, session_store, &config);

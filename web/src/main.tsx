@@ -4,6 +4,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/space-grotesk'
 import './index.css'
+import { registerSW } from 'virtual:pwa-register'
+import './lib/install'
 import { routeTree } from './routeTree.gen'
 
 const queryClient = new QueryClient()
@@ -23,3 +25,6 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+// Installs the service worker, which keeps the app working offline and shows reminders.
+registerSW({ immediate: true })

@@ -89,6 +89,9 @@ pub struct TaskView {
     pub due_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339::option")]
     pub overdue_at: Option<OffsetDateTime>,
+    /// Set while the task is snoozed. `due_at` already counts the snooze.
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub snoozed_until: Option<OffsetDateTime>,
     pub container: String,
     pub plant_name: String,
 }
@@ -271,7 +274,7 @@ pub async fn open_tasks(
     let rows = sqlx::query!(
         r#"
         SELECT t.id, t.batch_id, t.step_index, t.kind::text AS "kind!", t.action,
-               coalesce(t.snoozed_until, t.due_at) AS "due_at!", t.overdue_at,
+               coalesce(t.snoozed_until, t.due_at) AS "due_at!", t.overdue_at, t.snoozed_until,
                c.name AS container, b.plant ->> 'name' AS "plant_name!"
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
@@ -305,6 +308,7 @@ pub async fn open_tasks(
                 action,
                 due_at: row.due_at,
                 overdue_at: row.overdue_at,
+                snoozed_until: row.snoozed_until,
                 container: row.container,
                 plant_name: row.plant_name,
             })
@@ -422,6 +426,56 @@ pub async fn complete_task(
         TaskAction::Advance(_) => advance(&mut tx, task.batch_id, &plant, step_index, now).await?,
     }
 
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Pushes a task back to `until`. It counts as not notified again, so a reminder goes out when
+/// the snooze ends.
+pub async fn snooze_task(
+    pool: &PgPool,
+    user_id: Uuid,
+    task_id: Uuid,
+    until: OffsetDateTime,
+    now: OffsetDateTime,
+) -> Result<(), AppError> {
+    if until <= now {
+        return Err(AppError::invalid("until", "must be in the future"));
+    }
+    if until > now + time::Duration::days(7) {
+        return Err(AppError::invalid("until", "must be within a week"));
+    }
+
+    let mut tx = pool.begin().await?;
+    let task = sqlx::query!(
+        r#"
+        SELECT t.done_at, b.status AS "status: BatchStatus"
+        FROM tasks t
+        JOIN batches b ON b.id = t.batch_id
+        WHERE t.id = $1 AND b.user_id = $2
+        FOR UPDATE OF t
+        "#,
+        task_id,
+        user_id,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    if task.done_at.is_some() {
+        return Err(AppError::Conflict("task_done"));
+    }
+    if task.status != BatchStatus::Active {
+        return Err(AppError::Conflict("batch_not_active"));
+    }
+
+    sqlx::query!(
+        "UPDATE tasks SET snoozed_until = $2, notified_at = NULL WHERE id = $1",
+        task_id,
+        until,
+    )
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(())
 }
@@ -860,6 +914,47 @@ mod tests {
         assert!(matches!(
             containers::delete(&pool, jar_1).await,
             Err(AppError::Conflict("container_has_history"))
+        ));
+    }
+
+    #[sqlx::test]
+    async fn snoozing_moves_a_task_and_resets_its_reminder(pool: PgPool) {
+        let user_id = user(&pool, "grower").await;
+        let id = alfalfa_batch(&pool, user_id).await;
+        let task = &tasks(&pool, user_id, id).await[0];
+        sqlx::query!(
+            "UPDATE tasks SET notified_at = $2 WHERE id = $1",
+            task.id,
+            START
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let now = datetime!(2026-10-05 16:30 UTC);
+        let until = datetime!(2026-10-05 18:00 UTC);
+        snooze_task(&pool, user_id, task.id, until, now)
+            .await
+            .unwrap();
+
+        let snoozed = &tasks(&pool, user_id, id).await[0];
+        assert_eq!(snoozed.due_at, until);
+        assert_eq!(snoozed.snoozed_until, Some(until));
+        let notified = sqlx::query_scalar!("SELECT notified_at FROM tasks WHERE id = $1", task.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(notified, None);
+
+        let past = snooze_task(&pool, user_id, task.id, now, now).await;
+        assert!(matches!(past, Err(AppError::Invalid(_))));
+        let too_far =
+            snooze_task(&pool, user_id, task.id, now + time::Duration::days(8), now).await;
+        assert!(matches!(too_far, Err(AppError::Invalid(_))));
+        let other = user(&pool, "neighbour").await;
+        assert!(matches!(
+            snooze_task(&pool, other, task.id, until, now).await,
+            Err(AppError::NotFound)
         ));
     }
 }

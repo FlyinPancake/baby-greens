@@ -16,6 +16,7 @@ export type CareAction = Schemas['CareAction']
 export type Problem = Schemas['Problem']
 export type ErrorBody = Schemas['ErrorBody']
 export type Container = Schemas['Container']
+export type QuietHours = Schemas['QuietHours']
 export type ContainerKind = Schemas['ContainerKind']
 
 export const api = createClient<paths>({ baseUrl: '/api/v1' })

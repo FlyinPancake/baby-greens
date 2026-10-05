@@ -12,6 +12,16 @@ pub struct Config {
     /// Directory with the built frontend. When unset, the server only serves the API.
     pub web_dist: Option<PathBuf>,
     pub oidc: OidcConfig,
+    /// Web push settings. Push notifications are off when `VAPID_PRIVATE_KEY` is unset.
+    pub push: Option<PushConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PushConfig {
+    /// The VAPID private key, as base64url. `baby-greens-server vapid-key` makes one.
+    pub vapid_private_key: String,
+    /// Who push services can contact about this server: a `mailto:` or `https:` URL.
+    pub vapid_subject: String,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +49,7 @@ impl Config {
             bind_addr,
             public_url,
             web_dist: env::var_os("WEB_DIST").map(PathBuf::from),
+            push: push_from_env()?,
             oidc: OidcConfig {
                 issuer_url: required("OIDC_ISSUER_URL")?,
                 client_id: required("OIDC_CLIENT_ID")?,
@@ -49,6 +60,24 @@ impl Config {
             },
         })
     }
+}
+
+fn push_from_env() -> Result<Option<PushConfig>> {
+    let Some(vapid_private_key) = env::var("VAPID_PRIVATE_KEY")
+        .ok()
+        .filter(|key| !key.is_empty())
+    else {
+        return Ok(None);
+    };
+    let vapid_subject = required("VAPID_SUBJECT")
+        .context("VAPID_SUBJECT is required when VAPID_PRIVATE_KEY is set")?;
+    if !vapid_subject.starts_with("mailto:") && !vapid_subject.starts_with("https://") {
+        anyhow::bail!("VAPID_SUBJECT must be a mailto: or https: URL");
+    }
+    Ok(Some(PushConfig {
+        vapid_private_key,
+        vapid_subject,
+    }))
 }
 
 fn required(name: &str) -> Result<String> {

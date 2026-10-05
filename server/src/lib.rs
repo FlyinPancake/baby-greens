@@ -6,6 +6,8 @@ pub mod config;
 pub mod db;
 pub mod domain;
 pub mod error;
+pub mod jobs;
+pub mod notify;
 
 use std::sync::Arc;
 
@@ -24,6 +26,8 @@ use crate::{auth::AuthState, config::Config};
 pub struct AppState {
     pub pool: PgPool,
     pub auth: Arc<AuthState>,
+    /// None when push notifications aren't configured.
+    pub push: Option<Arc<notify::WebPush>>,
 }
 
 pub fn app(state: AppState, session_store: PostgresStore, config: &Config) -> Router {

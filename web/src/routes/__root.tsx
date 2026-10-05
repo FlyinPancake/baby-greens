@@ -1,11 +1,11 @@
-import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useQuery } from '@tanstack/react-query'
 import { createRootRouteWithContext, Link, Outlet, useSearch } from '@tanstack/react-router'
-import { CalendarCheck, Container, LogOut, type LucideIcon, Sprout } from 'lucide-react'
+import { CalendarCheck, Container, type LucideIcon, Settings, Sprout } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { Highlight } from '@/components/PageHeading'
 import { Button } from '@/components/ui/button'
-import { loginUrl, logout, meQuery } from '@/lib/api'
+import { loginUrl, meQuery } from '@/lib/api'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: RootLayout,
@@ -36,8 +36,10 @@ function RootLayout() {
                 <NavLink to="/containers" icon={Container}>
                   Jars
                 </NavLink>
+                <NavLink to="/settings" icon={Settings}>
+                  Settings
+                </NavLink>
               </nav>
-              <SignOutButton name={me.data.display_name} />
             </div>
           )}
         </div>
@@ -57,13 +59,13 @@ function RootLayout() {
   )
 }
 
-/** A header link. Phones show only the icon, so three links and sign-out fit at 320 px. */
+/** A header link. Phones show only the icon, so all four fit at 320 px. */
 function NavLink({
   to,
   icon: Icon,
   children,
 }: {
-  to: '/' | '/plants' | '/containers'
+  to: '/' | '/plants' | '/containers' | '/settings'
   icon: LucideIcon
   children: ReactNode
 }) {
@@ -77,30 +79,6 @@ function NavLink({
       <Icon className="size-4" />
       <span className="hidden sm:inline">{children}</span>
     </Link>
-  )
-}
-
-function SignOutButton({ name }: { name: string }) {
-  const queryClient = useQueryClient()
-  const signOut = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      queryClient.clear()
-      queryClient.setQueryData(meQuery.queryKey, null)
-    },
-  })
-
-  return (
-    <Button
-      variant="neutral"
-      size="icon-sm"
-      onClick={() => signOut.mutate()}
-      disabled={signOut.isPending}
-      aria-label={`Sign out ${name}`}
-      title={`Signed in as ${name}. Sign out.`}
-    >
-      <LogOut />
-    </Button>
   )
 }
 

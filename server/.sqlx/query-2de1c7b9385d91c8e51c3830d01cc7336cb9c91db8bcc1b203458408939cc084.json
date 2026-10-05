@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT t.done_at, b.status AS \"status: BatchStatus\"\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        WHERE t.id = $1 AND b.user_id = $2\n        FOR UPDATE OF t\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "done_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "status: BatchStatus",
+        "type_info": {
+          "Custom": {
+            "name": "batch_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "harvested",
+                "discarded"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "2de1c7b9385d91c8e51c3830d01cc7336cb9c91db8bcc1b203458408939cc084"
+}
