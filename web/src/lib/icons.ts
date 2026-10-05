@@ -1,6 +1,8 @@
 import {
+  Amphora,
   Droplet,
   Droplets,
+  Inbox,
   type LucideIcon,
   Moon,
   Scissors,
@@ -9,7 +11,7 @@ import {
   Sun,
   Waves,
 } from 'lucide-react'
-import type { CareAction, StepAction } from './api'
+import type { CareAction, ContainerKind, StepAction } from './api'
 
 export const stepIcons: Record<StepAction, LucideIcon> = {
   soak: Waves,
@@ -24,3 +26,13 @@ export const careIcons: Record<CareAction, LucideIcon> = {
   water: Droplet,
   mist: SprayCan,
 }
+
+export const containerIcons: Record<ContainerKind, LucideIcon> = {
+  jar: Amphora,
+  tray: Inbox,
+}
+
+export const containerKindOptions: { value: ContainerKind; label: string; icon: LucideIcon }[] = [
+  { value: 'jar', label: 'Jar', icon: Amphora },
+  { value: 'tray', label: 'Tray', icon: Inbox },
+]

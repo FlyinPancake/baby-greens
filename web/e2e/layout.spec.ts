@@ -20,6 +20,7 @@ const pages = [
   { path: '/plants/pea-shoots', ready: 'Basics' },
   { path: '/plants/e2e-new-plant', ready: 'This slug is free' },
   { path: '/batches/new', ready: 'Pick a plant' },
+  { path: '/containers', ready: 'Add a jar or tray' },
 ]
 
 for (const { path, ready } of pages) {
@@ -32,7 +33,17 @@ for (const { path, ready } of pages) {
 
 test('the batch form fits the screen with a plant picked', async ({ page }) => {
   await page.goto('/batches/new')
-  await page.getByRole('radio', { name: /Sunflower microgreens/ }).click()
+  await page.getByRole('radiogroup', { name: 'Plant' }).getByRole('radio', { name: /Sunflower microgreens/ }).click()
   await expect(page.getByText('Grow ticket')).toBeVisible()
+  expect(await overflowing(page)).toEqual([])
+})
+
+test('a container page fits the screen', async ({ page }) => {
+  await page.goto('/containers')
+  await expect(page.getByText('Add a jar or tray')).toBeVisible()
+  const containers = await page.evaluate(() => fetch('/api/v1/containers').then((r) => r.json()))
+  test.skip(containers.length === 0, 'no containers to open')
+  await page.goto(`/containers/${containers[0].id}`)
+  await expect(page.getByText('Your batches in it')).toBeVisible()
   expect(await overflowing(page)).toEqual([])
 })

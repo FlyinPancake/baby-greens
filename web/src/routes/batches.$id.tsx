@@ -66,7 +66,15 @@ function Batch({ detail }: { detail: BatchDetail }) {
         </div>
 
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Fact label="Container">{batch.container}</Fact>
+          <Fact label="Container">
+            <Link
+              to="/containers/$id"
+              params={{ id: batch.container_id }}
+              className="underline decoration-2 underline-offset-2"
+            >
+              {batch.container}
+            </Link>
+          </Fact>
           <Fact label="Seed">{batch.seed_g} g</Fact>
           <Fact label="Started">{formatWhen(batch.started_at, now)}</Fact>
           <Fact label="Harvest">

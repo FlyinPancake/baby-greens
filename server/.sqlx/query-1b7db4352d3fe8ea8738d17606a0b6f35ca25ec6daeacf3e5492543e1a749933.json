@@ -1,0 +1,84 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT c.id, c.name, c.kind AS \"kind: ContainerKind\", c.notes, c.archived_at,\n               (SELECT count(*) FROM batches b WHERE b.container_id = c.id) AS \"batch_count!\",\n               a.id AS \"active_id?\", a.user_id AS \"active_user?\",\n               a.plant ->> 'name' AS \"active_plant?\", u.display_name AS \"active_grower?\"\n        FROM containers c\n        LEFT JOIN batches a ON a.container_id = c.id AND a.status = 'active'\n        LEFT JOIN users u ON u.id = a.user_id\n        ORDER BY c.archived_at IS NOT NULL, lower(c.name)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind: ContainerKind",
+        "type_info": {
+          "Custom": {
+            "name": "container_kind",
+            "kind": {
+              "Enum": [
+                "jar",
+                "tray"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "archived_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "batch_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "active_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "active_user?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "active_plant?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "active_grower?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      false,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "1b7db4352d3fe8ea8738d17606a0b6f35ca25ec6daeacf3e5492543e1a749933"
+}

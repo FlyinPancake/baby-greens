@@ -2,6 +2,7 @@
 //! the router and the OpenAPI spec come from the same list.
 
 mod batches;
+mod containers;
 mod extract;
 mod plants;
 mod tasks;
@@ -34,7 +35,8 @@ use crate::{
     tags(
         (name = "account", description = "The signed-in user"),
         (name = "plants", description = "The plant library"),
-        (name = "batches", description = "Jars and trays you're growing"),
+        (name = "batches", description = "What you're growing"),
+        (name = "containers", description = "Jars and trays, shared by the household"),
         (name = "tasks", description = "Chores and step changes"),
     ),
 )]
@@ -58,6 +60,7 @@ fn v1() -> OpenApiRouter<AppState> {
         .routes(routes!(me))
         .merge(plants::router())
         .merge(batches::router())
+        .merge(containers::router())
         .merge(tasks::router())
 }
 
@@ -132,6 +135,8 @@ mod tests {
                 "/batches",
                 "/batches/{id}",
                 "/batches/{id}/discard",
+                "/containers",
+                "/containers/{id}",
                 "/me",
                 "/plants",
                 "/plants/{slug}",

@@ -16,6 +16,8 @@ export default defineConfig({
     // The Dex redirect URI in dev/dex.yaml expects this port.
     port: 5173,
     strictPort: true,
+    // Playwright writes into these while tests run. A change there must not reload open pages.
+    watch: { ignored: ['**/e2e/**', '**/test-results/**', '**/playwright-report/**'] },
     // Proxying keeps the API on the same origin as the app, so session cookies work in dev.
     proxy: {
       '/api': server,

@@ -15,6 +15,8 @@ export type StepAction = Schemas['StepAction']
 export type CareAction = Schemas['CareAction']
 export type Problem = Schemas['Problem']
 export type ErrorBody = Schemas['ErrorBody']
+export type Container = Schemas['Container']
+export type ContainerKind = Schemas['ContainerKind']
 
 export const api = createClient<paths>({ baseUrl: '/api/v1' })
 
@@ -72,10 +74,26 @@ export const plantQuery = (slug: string) =>
     retry: false,
   })
 
-export const batchesQuery = (status?: BatchStatus) =>
+export const batchesQuery = (filter: { status?: BatchStatus; containerId?: string } = {}) =>
   queryOptions({
-    queryKey: ['batches', { status }],
-    queryFn: () => unwrap(api.GET('/batches', { params: { query: { status } } })),
+    queryKey: ['batches', filter],
+    queryFn: () =>
+      unwrap(
+        api.GET('/batches', {
+          params: { query: { status: filter.status, container_id: filter.containerId } },
+        }),
+      ),
+  })
+
+export const containersQuery = queryOptions({
+  queryKey: ['containers'],
+  queryFn: () => unwrap(api.GET('/containers')),
+})
+
+export const containerQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['containers', id],
+    queryFn: () => unwrap(api.GET('/containers/{id}', { params: { path: { id } } })),
   })
 
 export const batchQuery = (id: string) =>

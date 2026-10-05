@@ -10,7 +10,7 @@ use crate::{
     AppState,
     auth::AuthUser,
     db::{
-        batches::{self, BatchDetail, BatchStatus, BatchSummary, NewBatch},
+        batches::{self, BatchDetail, BatchFilter, BatchStatus, BatchSummary, NewBatch},
         plants,
     },
     domain::plant::{Problem, Slug},
@@ -29,6 +29,8 @@ pub fn router() -> OpenApiRouter<AppState> {
 struct ListQuery {
     /// Only return batches with this status.
     status: Option<BatchStatus>,
+    /// Only return batches grown in this jar or tray.
+    container_id: Option<Uuid>,
 }
 
 /// List your batches, newest first.
@@ -48,17 +50,19 @@ async fn list_batches(
     AuthUser(user): AuthUser,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<BatchSummary>>, AppError> {
-    Ok(Json(
-        batches::list(&state.pool, user.id, query.status).await?,
-    ))
+    let filter = BatchFilter {
+        status: query.status,
+        container_id: query.container_id,
+    };
+    Ok(Json(batches::list(&state.pool, user.id, filter).await?))
 }
 
 #[derive(Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 struct CreateBatch {
     plant_slug: Slug,
-    /// Which jar or tray, like "jar 2" or "tray A".
-    container: String,
+    /// The jar or tray to grow in. It must not be archived or hold another active batch.
+    container_id: Uuid,
     /// Seed weight in grams. Defaults to the plant's `seed_g`.
     seed_g: Option<u32>,
     /// When the first step started. Defaults to now. Can't be in the future.
@@ -80,6 +84,7 @@ struct CreateBatch {
         (status = 201, body = BatchDetail),
         (status = 400, body = ErrorBody),
         (status = 401, body = ErrorBody),
+        (status = 409, description = "The jar or tray holds another active batch (`container_in_use`)", body = ErrorBody),
         (status = 422, body = ErrorBody),
     ),
 )]
@@ -100,11 +105,6 @@ async fn create_batch(
     let plant = plants::find(&state.pool, &request.plant_slug).await?;
     if plant.is_none() {
         report("plant_slug", "no plant has this slug");
-    }
-
-    let container = request.container.trim().to_owned();
-    if container.is_empty() {
-        report("container", "must not be empty");
     }
 
     let seed_g = request
@@ -134,7 +134,7 @@ async fn create_batch(
         NewBatch {
             plant_slug: entry.slug,
             plant: entry.plant,
-            container,
+            container_id: request.container_id,
             seed_g,
             started_at,
             notes: request.notes,

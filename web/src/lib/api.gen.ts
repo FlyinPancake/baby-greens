@@ -58,6 +58,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/containers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List every jar and tray in the household, unarchived ones first. */
+        get: operations["list_containers"];
+        put?: never;
+        /** Add a jar or tray for the whole household. */
+        post: operations["create_container"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/containers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_container"];
+        put?: never;
+        post?: never;
+        /** Delete a jar or tray that has never held a batch. Archive one with history instead. */
+        delete: operations["delete_container"];
+        options?: never;
+        head?: never;
+        /** Rename, edit, archive, or restore a jar or tray. */
+        patch: operations["update_container"];
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -171,7 +207,10 @@ export interface components {
         /** @enum {string} */
         BatchStatus: "active" | "harvested" | "discarded";
         BatchSummary: {
+            /** @description The container's current name. */
             container: string;
+            /** Format: uuid */
+            container_id: string;
             current_action: components["schemas"]["StepAction"];
             current_step: number;
             harvest_window?: components["schemas"]["HarvestWindow"] | null;
@@ -195,9 +234,29 @@ export interface components {
         };
         /** @enum {string} */
         CareAction: "rinse" | "water" | "mist";
+        Container: {
+            /** Format: date-time */
+            archived_at?: string | null;
+            /**
+             * Format: int64
+             * @description How many batches this container has held, across the household.
+             */
+            batch_count: number;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ContainerKind"];
+            name: string;
+            notes: string;
+            occupant?: components["schemas"]["Occupant"] | null;
+        };
+        /** @enum {string} */
+        ContainerKind: "jar" | "tray";
         CreateBatch: {
-            /** @description Which jar or tray, like "jar 2" or "tray A". */
-            container: string;
+            /**
+             * Format: uuid
+             * @description The jar or tray to grow in. It must not be archived or hold another active batch.
+             */
+            container_id: string;
             notes?: string;
             plant_slug: components["schemas"]["Slug"];
             /**
@@ -210,6 +269,12 @@ export interface components {
              * @description When the first step started. Defaults to now. Can't be in the future.
              */
             started_at?: string | null;
+        };
+        CreateContainer: {
+            kind: components["schemas"]["ContainerKind"];
+            /** @description Unique in the household, ignoring case. */
+            name: string;
+            notes?: string;
         };
         /** @description The body of every error response. */
         ErrorBody: {
@@ -229,6 +294,19 @@ export interface components {
             plant: components["schemas"]["Plant"];
             slug: components["schemas"]["Slug"];
             source: components["schemas"]["Source"];
+        };
+        /**
+         * @description The active batch in a container. Another household member's batch shows who grows it, but
+         *     not its id, because batches are private to their owner.
+         */
+        Occupant: {
+            /**
+             * Format: uuid
+             * @description Set when the batch is yours, so you can link to it.
+             */
+            batch_id?: string | null;
+            grower: string;
+            plant_name: string;
         };
         Plant: {
             kind: components["schemas"]["PlantKind"];
@@ -315,6 +393,14 @@ export interface components {
             plant_name: string;
             step_index: number;
         };
+        /** @description Fields to change. Leave a field out to keep it. */
+        UpdateContainer: {
+            /** @description Archive or restore. Archived containers can't take new batches. */
+            archived?: boolean | null;
+            kind?: components["schemas"]["ContainerKind"] | null;
+            name?: string | null;
+            notes?: string | null;
+        };
         User: {
             display_name: string;
             email?: string | null;
@@ -336,6 +422,8 @@ export interface operations {
             query?: {
                 /** @description Only return batches with this status. */
                 status?: components["schemas"]["BatchStatus"];
+                /** @description Only return batches grown in this jar or tray. */
+                container_id?: string;
             };
             header?: never;
             path?: never;
@@ -391,6 +479,15 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The jar or tray holds another active batch (`container_in_use`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -481,6 +578,229 @@ export interface operations {
             };
             /** @description The batch isn't active */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_containers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Container"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_container: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContainer"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Container"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The name is empty, too long, or taken */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_container: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Container"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_container: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description It has held batches (`container_has_history`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_container: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContainer"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Container"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Archiving a container with an active batch (`container_in_use`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

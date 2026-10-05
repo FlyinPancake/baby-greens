@@ -1,6 +1,6 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, Link, Outlet, useSearch } from '@tanstack/react-router'
-import { LogOut, Sprout } from 'lucide-react'
+import { CalendarCheck, Container, LogOut, type LucideIcon, Sprout } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { Highlight } from '@/components/PageHeading'
@@ -27,8 +27,15 @@ function RootLayout() {
           {me.data && (
             <div className="flex items-center gap-2">
               <nav className="flex gap-2">
-                <NavLink to="/">Today</NavLink>
-                <NavLink to="/plants">Plants</NavLink>
+                <NavLink to="/" icon={CalendarCheck}>
+                  Today
+                </NavLink>
+                <NavLink to="/plants" icon={Sprout}>
+                  Plants
+                </NavLink>
+                <NavLink to="/containers" icon={Container}>
+                  Jars
+                </NavLink>
               </nav>
               <SignOutButton name={me.data.display_name} />
             </div>
@@ -50,14 +57,25 @@ function RootLayout() {
   )
 }
 
-function NavLink({ to, children }: { to: '/' | '/plants'; children: ReactNode }) {
+/** A header link. Phones show only the icon, so three links and sign-out fit at 320 px. */
+function NavLink({
+  to,
+  icon: Icon,
+  children,
+}: {
+  to: '/' | '/plants' | '/containers'
+  icon: LucideIcon
+  children: ReactNode
+}) {
   return (
     <Link
       to={to}
       activeOptions={{ exact: to === '/' }}
-      className="rounded-base border-2 border-border bg-secondary-background px-3 py-1.5 text-sm font-heading transition-all hover:bg-main [&.active]:bg-main [&.active]:shadow-shadow"
+      aria-label={typeof children === 'string' ? children : undefined}
+      className="flex items-center gap-1.5 rounded-base border-2 border-border bg-secondary-background px-2.5 py-1.5 text-sm font-heading transition-all hover:bg-main sm:px-3 [&.active]:bg-main [&.active]:shadow-shadow"
     >
-      {children}
+      <Icon className="size-4" />
+      <span className="hidden sm:inline">{children}</span>
     </Link>
   )
 }

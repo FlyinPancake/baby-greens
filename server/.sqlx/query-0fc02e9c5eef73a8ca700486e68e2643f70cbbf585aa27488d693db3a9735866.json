@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (SELECT 1 FROM batches WHERE container_id = c.id) AS \"has_history!\"\n        FROM containers c WHERE c.id = $1\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "has_history!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0fc02e9c5eef73a8ca700486e68e2643f70cbbf585aa27488d693db3a9735866"
+}

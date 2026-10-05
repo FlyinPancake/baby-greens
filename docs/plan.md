@@ -80,9 +80,11 @@ The JSON API lives under `/api/v1`, so a future native app can stay on `v1` whil
 | GET | `/me` | The signed-in user |
 | GET | `/plants` | The library, with each plant's source: `builtin`, `custom`, or `override` |
 | GET, PUT, DELETE | `/plants/{slug}` | Read, save, or delete a custom plant. PUT validates first |
-| GET, POST | `/batches` | List batches (optionally by status), or start one |
+| GET, POST | `/batches` | List batches (optionally by status or container), or start one |
 | GET | `/batches/{id}` | A batch with its step history, upcoming windows, and open tasks |
 | POST | `/batches/{id}/discard` | Stop an active batch |
+| GET, POST | `/containers` | List the household's jars and trays with what grows in them, or add one |
+| GET, PATCH, DELETE | `/containers/{id}` | Read, rename, archive, or restore one. DELETE only works without history |
 | GET | `/tasks?due_before=` | Open tasks on active batches, soonest first |
 | POST | `/tasks/{id}/complete` | Finish a care chore, or advance the batch for an advance task |
 
@@ -154,7 +156,9 @@ ApiToken       (id, user, name, token_hash, last_used_at?, created_at)   -- late
 PushSubscription (id, user, endpoint, p256dh, auth, user_agent, created_at)
 
 CustomPlant    (slug PK, definition jsonb, created_by?, created_at, updated_at)
-Batch          (id, user, plant_slug, plant jsonb, current_step, container, seed_g,
+Container      (id, name unique ignoring case, kind: jar|tray, notes, created_by?,
+                created_at, archived_at?)
+Batch          (id, user, plant_slug, plant jsonb, current_step, container_id, seed_g,
                 started_at, status, notes)
 BatchStep      (batch, step_index, started_at, ended_at?)
 Task           (id, batch, step_index, kind: advance|care, action, due_at, overdue_at?,
@@ -162,11 +166,13 @@ Task           (id, batch, step_index, kind: advance|care, action, due_at, overd
 Harvest        (id, batch, harvested_at, yield_g, rating, notes)
 ```
 
-Custom plants are shared by every account on the server. A batch stores a copy of its plant's
-definition from when it started, so editing a plant only affects new batches. `BatchStep` records
-how long each step actually took. All times are `timestamptz`. The server uses `User.timezone` for
-quiet hours and for showing "today". The `kind` and `status` columns are Postgres enums mapped to
-Rust enums with `sqlx::Type`.
+Custom plants and containers are shared by every account on the server. A container holds one active
+batch at a time, which a partial unique index enforces. Containers with past batches get archived
+instead of deleted, so history keeps its jar. A batch stores a copy of its plant's definition from
+when it started, so editing a plant only affects new batches. `BatchStep` records how long each step
+actually took. All times are `timestamptz`. The server uses `User.timezone` for quiet hours and for
+showing "today". The `kind` and `status` columns are Postgres enums mapped to Rust enums with
+`sqlx::Type`.
 
 ## Plant definitions
 

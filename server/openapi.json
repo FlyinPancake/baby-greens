@@ -30,6 +30,16 @@
             "schema": {
               "$ref": "#/components/schemas/BatchStatus"
             }
+          },
+          {
+            "name": "container_id",
+            "in": "query",
+            "description": "Only return batches grown in this jar or tray.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -97,6 +107,16 @@
             }
           },
           "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The jar or tray holds another active batch (`container_in_use`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -217,6 +237,303 @@
           },
           "409": {
             "description": "The batch isn't active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/containers": {
+      "get": {
+        "tags": [
+          "containers"
+        ],
+        "summary": "List every jar and tray in the household, unarchived ones first.",
+        "operationId": "list_containers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Container"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "containers"
+        ],
+        "summary": "Add a jar or tray for the whole household.",
+        "operationId": "create_container",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContainer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Container"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The name is empty, too long, or taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/containers/{id}": {
+      "get": {
+        "tags": [
+          "containers"
+        ],
+        "operationId": "get_container",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Container"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "containers"
+        ],
+        "summary": "Delete a jar or tray that has never held a batch. Archive one with history instead.",
+        "operationId": "delete_container",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It has held batches (`container_has_history`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "containers"
+        ],
+        "summary": "Rename, edit, archive, or restore a jar or tray.",
+        "operationId": "update_container",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContainer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Container"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Archiving a container with an active batch (`container_in_use`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
             "content": {
               "application/json": {
                 "schema": {
@@ -651,6 +968,7 @@
           "plant_slug",
           "plant_name",
           "plant_kind",
+          "container_id",
           "container",
           "seed_g",
           "started_at",
@@ -661,7 +979,12 @@
         ],
         "properties": {
           "container": {
-            "type": "string"
+            "type": "string",
+            "description": "The container's current name."
+          },
+          "container_id": {
+            "type": "string",
+            "format": "uuid"
           },
           "current_action": {
             "$ref": "#/components/schemas/StepAction"
@@ -736,16 +1059,72 @@
           "mist"
         ]
       },
+      "Container": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "notes",
+          "batch_count"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "batch_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many batches this container has held, across the household."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ContainerKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "occupant": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Occupant",
+                "description": "The batch growing in it right now, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ContainerKind": {
+        "type": "string",
+        "enum": [
+          "jar",
+          "tray"
+        ]
+      },
       "CreateBatch": {
         "type": "object",
         "required": [
           "plant_slug",
-          "container"
+          "container_id"
         ],
         "properties": {
-          "container": {
+          "container_id": {
             "type": "string",
-            "description": "Which jar or tray, like \"jar 2\" or \"tray A\"."
+            "format": "uuid",
+            "description": "The jar or tray to grow in. It must not be archived or hold another active batch."
           },
           "notes": {
             "type": "string"
@@ -769,6 +1148,26 @@
             ],
             "format": "date-time",
             "description": "When the first step started. Defaults to now. Can't be in the future."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateContainer": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ContainerKind"
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique in the household, ignoring case."
+          },
+          "notes": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -832,6 +1231,30 @@
           },
           "source": {
             "$ref": "#/components/schemas/Source"
+          }
+        }
+      },
+      "Occupant": {
+        "type": "object",
+        "description": "The active batch in a container. Another household member's batch shows who grows it, but\nnot its id, because batches are private to their owner.",
+        "required": [
+          "plant_name",
+          "grower"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Set when the batch is yours, so you can link to it."
+          },
+          "grower": {
+            "type": "string"
+          },
+          "plant_name": {
+            "type": "string"
           }
         }
       },
@@ -1109,6 +1532,42 @@
           }
         ]
       },
+      "UpdateContainer": {
+        "type": "object",
+        "description": "Fields to change. Leave a field out to keep it.",
+        "properties": {
+          "archived": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Archive or restore. Archived containers can't take new batches."
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ContainerKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "User": {
         "type": "object",
         "required": [
@@ -1155,7 +1614,11 @@
     },
     {
       "name": "batches",
-      "description": "Jars and trays you're growing"
+      "description": "What you're growing"
+    },
+    {
+      "name": "containers",
+      "description": "Jars and trays, shared by the household"
     },
     {
       "name": "tasks",

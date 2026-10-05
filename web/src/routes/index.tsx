@@ -29,7 +29,7 @@ function Today() {
   const now = useNow()
   const me = useQuery(meQuery)
   const tasks = useQuery(tasksQuery)
-  const batches = useQuery(batchesQuery('active'))
+  const batches = useQuery(batchesQuery({ status: 'active' }))
 
   const endOfDay = endOfToday(now)
   const today = tasks.data?.filter((task) => new Date(task.due_at) <= endOfDay) ?? []

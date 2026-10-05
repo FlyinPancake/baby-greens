@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BatchesIdRouteImport } from './routes/batches.$id'
 import { Route as BatchesNewRouteImport } from './routes/batches.new'
+import { Route as ContainersIndexRouteImport } from './routes/containers.index'
+import { Route as ContainersIdRouteImport } from './routes/containers.$id'
 import { Route as PlantsIndexRouteImport } from './routes/plants.index'
 import { Route as PlantsSlugRouteImport } from './routes/plants.$slug'
 
@@ -30,6 +32,16 @@ const BatchesNewRoute = BatchesNewRouteImport.update({
   path: '/batches/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContainersIndexRoute = ContainersIndexRouteImport.update({
+  id: '/containers/',
+  path: '/containers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContainersIdRoute = ContainersIdRouteImport.update({
+  id: '/containers/$id',
+  path: '/containers/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlantsIndexRoute = PlantsIndexRouteImport.update({
   id: '/plants/',
   path: '/plants/',
@@ -45,14 +57,18 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/batches/$id': typeof BatchesIdRoute
   '/batches/new': typeof BatchesNewRoute
+  '/containers/$id': typeof ContainersIdRoute
   '/plants/$slug': typeof PlantsSlugRoute
+  '/containers/': typeof ContainersIndexRoute
   '/plants/': typeof PlantsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/batches/$id': typeof BatchesIdRoute
   '/batches/new': typeof BatchesNewRoute
+  '/containers/$id': typeof ContainersIdRoute
   '/plants/$slug': typeof PlantsSlugRoute
+  '/containers': typeof ContainersIndexRoute
   '/plants': typeof PlantsIndexRoute
 }
 export interface FileRoutesById {
@@ -60,21 +76,38 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/batches/$id': typeof BatchesIdRoute
   '/batches/new': typeof BatchesNewRoute
+  '/containers/$id': typeof ContainersIdRoute
   '/plants/$slug': typeof PlantsSlugRoute
+  '/containers/': typeof ContainersIndexRoute
   '/plants/': typeof PlantsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/batches/$id' | '/batches/new' | '/plants/$slug' | '/plants/'
+    | '/'
+    | '/batches/$id'
+    | '/batches/new'
+    | '/containers/$id'
+    | '/plants/$slug'
+    | '/containers/'
+    | '/plants/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/batches/$id' | '/batches/new' | '/plants/$slug' | '/plants'
+  to:
+    | '/'
+    | '/batches/$id'
+    | '/batches/new'
+    | '/containers/$id'
+    | '/plants/$slug'
+    | '/containers'
+    | '/plants'
   id:
     | '__root__'
     | '/'
     | '/batches/$id'
     | '/batches/new'
+    | '/containers/$id'
     | '/plants/$slug'
+    | '/containers/'
     | '/plants/'
   fileRoutesById: FileRoutesById
 }
@@ -82,7 +115,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BatchesIdRoute: typeof BatchesIdRoute
   BatchesNewRoute: typeof BatchesNewRoute
+  ContainersIdRoute: typeof ContainersIdRoute
   PlantsSlugRoute: typeof PlantsSlugRoute
+  ContainersIndexRoute: typeof ContainersIndexRoute
   PlantsIndexRoute: typeof PlantsIndexRoute
 }
 
@@ -109,6 +144,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BatchesNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/containers/': {
+      id: '/containers/'
+      path: '/containers'
+      fullPath: '/containers/'
+      preLoaderRoute: typeof ContainersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/containers/$id': {
+      id: '/containers/$id'
+      path: '/containers/$id'
+      fullPath: '/containers/$id'
+      preLoaderRoute: typeof ContainersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/plants/': {
       id: '/plants/'
       path: '/plants'
@@ -130,7 +179,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BatchesIdRoute: BatchesIdRoute,
   BatchesNewRoute: BatchesNewRoute,
+  ContainersIdRoute: ContainersIdRoute,
   PlantsSlugRoute: PlantsSlugRoute,
+  ContainersIndexRoute: ContainersIndexRoute,
   PlantsIndexRoute: PlantsIndexRoute,
 }
 export const routeTree = rootRouteImport

@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { BatchSummary } from '@/lib/api'
 import { stepLabels } from '@/lib/labels'
-import { formatWindow, percentBetween } from '@/lib/time'
+import { formatWhen, formatWindow, percentBetween } from '@/lib/time'
 import { useNow } from '@/lib/useNow'
 import { stepIcons } from '@/lib/icons'
 
@@ -30,11 +30,20 @@ export function BatchCard({ batch }: { batch: BatchSummary }) {
             {batch.plant_kind === 'sprout' ? 'sprout' : 'microgreen'}
           </Badge>
         </div>
-        <p className="flex items-center gap-2 text-sm font-heading">
-          <Icon className="size-4" />
-          {stepLabels[batch.current_action]}
-        </p>
-        <Progress value={progress} aria-label="Progress to the earliest harvest" />
+        {batch.status === 'active' ? (
+          <>
+            <p className="flex items-center gap-2 text-sm font-heading">
+              <Icon className="size-4" />
+              {stepLabels[batch.current_action]}
+            </p>
+            <Progress value={progress} aria-label="Progress to the earliest harvest" />
+          </>
+        ) : (
+          <p className="text-sm">
+            <span className="font-heading capitalize">{batch.status}</span>, started{' '}
+            {formatWhen(batch.started_at, now)}
+          </p>
+        )}
         {batch.harvest_window && (
           <p className="text-sm">
             Harvest <span className="font-heading">{formatWindow(batch.harvest_window.earliest, batch.harvest_window.latest, now)}</span>

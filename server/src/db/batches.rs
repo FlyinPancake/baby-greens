@@ -31,6 +31,8 @@ pub struct BatchSummary {
     pub plant_slug: String,
     pub plant_name: String,
     pub plant_kind: PlantKind,
+    pub container_id: Uuid,
+    /// The container's current name.
     pub container: String,
     pub seed_g: i32,
     #[serde(with = "time::serde::rfc3339")]
@@ -95,7 +97,7 @@ pub struct TaskView {
 pub struct NewBatch {
     pub plant_slug: Slug,
     pub plant: Plant,
-    pub container: String,
+    pub container_id: Uuid,
     pub seed_g: u32,
     pub started_at: OffsetDateTime,
     pub notes: String,
@@ -105,6 +107,7 @@ struct BatchRow {
     id: Uuid,
     plant_slug: String,
     plant: Json<Plant>,
+    container_id: Uuid,
     container: String,
     seed_g: i32,
     started_at: OffsetDateTime,
@@ -137,6 +140,7 @@ impl BatchRow {
             plant_slug: self.plant_slug.clone(),
             plant_name: plant.name.clone(),
             plant_kind: plant.kind,
+            container_id: self.container_id,
             container: self.container.clone(),
             seed_g: self.seed_g,
             started_at: self.started_at,
@@ -157,24 +161,35 @@ fn db_index(value: usize) -> Result<i32, AppError> {
     i32::try_from(value).map_err(|_| anyhow!("step index {value} is too large").into())
 }
 
+/// Which of the user's batches to list. Empty filters list them all.
+#[derive(Debug, Default)]
+pub struct BatchFilter {
+    pub status: Option<BatchStatus>,
+    pub container_id: Option<Uuid>,
+}
+
 pub async fn list(
     pool: &PgPool,
     user_id: Uuid,
-    status: Option<BatchStatus>,
+    filter: BatchFilter,
 ) -> Result<Vec<BatchSummary>, AppError> {
     let rows = sqlx::query_as!(
         BatchRow,
         r#"
-        SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container, b.seed_g,
-               b.started_at, b.status AS "status: BatchStatus", b.current_step, b.notes,
-               s.started_at AS step_started_at
+        SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container_id,
+               c.name AS container, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
+               b.current_step, b.notes, s.started_at AS step_started_at
         FROM batches b
+        JOIN containers c ON c.id = b.container_id
         JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
-        WHERE b.user_id = $1 AND ($2::batch_status IS NULL OR b.status = $2)
+        WHERE b.user_id = $1
+          AND ($2::batch_status IS NULL OR b.status = $2)
+          AND ($3::uuid IS NULL OR b.container_id = $3)
         ORDER BY b.started_at DESC
         "#,
         user_id,
-        status as Option<BatchStatus>,
+        filter.status as Option<BatchStatus>,
+        filter.container_id,
     )
     .fetch_all(pool)
     .await?;
@@ -186,10 +201,11 @@ pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail,
     let row = sqlx::query_as!(
         BatchRow,
         r#"
-        SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container, b.seed_g,
-               b.started_at, b.status AS "status: BatchStatus", b.current_step, b.notes,
-               s.started_at AS step_started_at
+        SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container_id,
+               c.name AS container, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
+               b.current_step, b.notes, s.started_at AS step_started_at
         FROM batches b
+        JOIN containers c ON c.id = b.container_id
         JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
         WHERE b.id = $1 AND b.user_id = $2
         "#,
@@ -256,9 +272,10 @@ pub async fn open_tasks(
         r#"
         SELECT t.id, t.batch_id, t.step_index, t.kind::text AS "kind!", t.action,
                coalesce(t.snoozed_until, t.due_at) AS "due_at!", t.overdue_at,
-               b.container, b.plant ->> 'name' AS "plant_name!"
+               c.name AS container, b.plant ->> 'name' AS "plant_name!"
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
+        JOIN containers c ON c.id = b.container_id
         WHERE b.user_id = $1
           AND b.status = 'active'
           AND t.done_at IS NULL
@@ -302,22 +319,48 @@ pub async fn create(pool: &PgPool, user_id: Uuid, batch: NewBatch) -> Result<Uui
     let seed_g =
         i32::try_from(batch.seed_g).map_err(|_| AppError::invalid("seed_g", "is too large"))?;
 
+    // Lock the container so it can't be archived while the batch goes in.
+    let archived = sqlx::query_scalar!(
+        "SELECT archived_at IS NOT NULL AS \"archived!\" FROM containers WHERE id = $1 FOR SHARE",
+        batch.container_id,
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    match archived {
+        None => {
+            return Err(AppError::invalid(
+                "container_id",
+                "no jar or tray has this id",
+            ));
+        }
+        Some(true) => return Err(AppError::invalid("container_id", "is archived")),
+        Some(false) => {}
+    }
+
     let id = sqlx::query_scalar!(
         r#"
-        INSERT INTO batches (user_id, plant_slug, plant, container, seed_g, started_at, notes)
+        INSERT INTO batches (user_id, plant_slug, plant, container_id, seed_g, started_at, notes)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
         "#,
         user_id,
         batch.plant_slug.as_str(),
         Json(&batch.plant) as _,
-        batch.container,
+        batch.container_id,
         seed_g,
         batch.started_at,
         batch.notes,
     )
     .fetch_one(&mut *tx)
-    .await?;
+    .await
+    .map_err(|error| match &error {
+        sqlx::Error::Database(db)
+            if db.constraint() == Some("batches_one_active_per_container") =>
+        {
+            AppError::Conflict("container_in_use")
+        }
+        _ => error.into(),
+    })?;
 
     enter_step(&mut tx, id, &batch.plant, 0, batch.started_at).await?;
 
@@ -532,7 +575,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        db::users::{self, Identity},
+        db::{
+            containers::{self, ContainerChanges, ContainerKind},
+            users::{self, Identity},
+        },
         domain::{library, plant::CareAction},
     };
 
@@ -548,19 +594,32 @@ mod tests {
         users::upsert_from_identity(pool, &identity).await.unwrap()
     }
 
-    /// Alfalfa: soak 8h to 12h, sprout 4d to 6d with a rinse every 12h, then harvest.
-    async fn alfalfa_batch(pool: &PgPool, user_id: Uuid) -> Uuid {
+    async fn jar(pool: &PgPool, user_id: Uuid, name: &str) -> Uuid {
+        containers::create(pool, user_id, name, ContainerKind::Jar, "")
+            .await
+            .unwrap()
+    }
+
+    fn alfalfa(container_id: Uuid) -> NewBatch {
         let slug: Slug = "alfalfa".parse().unwrap();
         let plant = library::builtin()[&slug].clone();
-        let batch = NewBatch {
+        NewBatch {
             plant_slug: slug,
             plant,
-            container: "jar 1".into(),
+            container_id,
             seed_g: 15,
             started_at: START,
             notes: String::new(),
-        };
-        create(pool, user_id, batch).await.unwrap()
+        }
+    }
+
+    /// Alfalfa in a new jar: soak 8h to 12h, sprout 4d to 6d with a rinse every 12h, then
+    /// harvest.
+    async fn alfalfa_batch(pool: &PgPool, user_id: Uuid) -> Uuid {
+        static JARS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = JARS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let container_id = jar(pool, user_id, &format!("jar {n}")).await;
+        create(pool, user_id, alfalfa(container_id)).await.unwrap()
     }
 
     async fn tasks(pool: &PgPool, user_id: Uuid, batch_id: Uuid) -> Vec<TaskView> {
@@ -661,7 +720,12 @@ mod tests {
         let id = alfalfa_batch(&pool, owner).await;
         let task_id = tasks(&pool, owner, id).await[0].id;
 
-        assert!(list(&pool, other, None).await.unwrap().is_empty());
+        assert!(
+            list(&pool, other, BatchFilter::default())
+                .await
+                .unwrap()
+                .is_empty()
+        );
         assert!(matches!(
             find(&pool, other, id).await,
             Err(AppError::NotFound)
@@ -700,13 +764,102 @@ mod tests {
             Err(AppError::NotFound)
         ));
 
-        let active = list(&pool, user_id, Some(BatchStatus::Active))
+        let active = BatchFilter {
+            status: Some(BatchStatus::Active),
+            ..Default::default()
+        };
+        assert!(list(&pool, user_id, active).await.unwrap().is_empty());
+        let discarded = BatchFilter {
+            status: Some(BatchStatus::Discarded),
+            ..Default::default()
+        };
+        assert_eq!(list(&pool, user_id, discarded).await.unwrap().len(), 1);
+    }
+
+    #[sqlx::test]
+    async fn one_active_batch_per_container(pool: PgPool) {
+        let grower = user(&pool, "grower").await;
+        let neighbour = user(&pool, "neighbour").await;
+        let jar_1 = jar(&pool, grower, "jar 1").await;
+
+        let first = create(&pool, grower, alfalfa(jar_1)).await.unwrap();
+        // Containers are shared, so the jar is busy for everyone.
+        let second = create(&pool, neighbour, alfalfa(jar_1)).await;
+        assert!(matches!(
+            second,
+            Err(AppError::Conflict("container_in_use"))
+        ));
+
+        // The jar can't be archived while something grows in it.
+        let archive = ContainerChanges {
+            archived: Some(true),
+            ..Default::default()
+        };
+        assert!(matches!(
+            containers::update(&pool, jar_1, archive, START).await,
+            Err(AppError::Conflict("container_in_use"))
+        ));
+
+        // Discarding frees it.
+        discard(&pool, grower, first, START).await.unwrap();
+        create(&pool, neighbour, alfalfa(jar_1)).await.unwrap();
+    }
+
+    #[sqlx::test]
+    async fn archived_containers_take_no_new_batches(pool: PgPool) {
+        let user_id = user(&pool, "grower").await;
+        let jar_1 = jar(&pool, user_id, "jar 1").await;
+        let archive = ContainerChanges {
+            archived: Some(true),
+            ..Default::default()
+        };
+        containers::update(&pool, jar_1, archive, START)
             .await
             .unwrap();
-        assert!(active.is_empty());
-        let discarded = list(&pool, user_id, Some(BatchStatus::Discarded))
-            .await
-            .unwrap();
-        assert_eq!(discarded.len(), 1);
+
+        let result = create(&pool, user_id, alfalfa(jar_1)).await;
+        assert!(
+            matches!(result, Err(AppError::Invalid(problems)) if problems[0].message == "is archived")
+        );
+        let missing = create(&pool, user_id, alfalfa(Uuid::nil())).await;
+        assert!(matches!(missing, Err(AppError::Invalid(_))));
+    }
+
+    #[sqlx::test]
+    async fn container_history_and_occupants(pool: PgPool) {
+        let grower = user(&pool, "grower").await;
+        let neighbour = user(&pool, "neighbour").await;
+        let jar_1 = jar(&pool, grower, "jar 1").await;
+        let jar_2 = jar(&pool, grower, "jar 2").await;
+
+        let old = create(&pool, grower, alfalfa(jar_1)).await.unwrap();
+        discard(&pool, grower, old, START).await.unwrap();
+        let current = create(&pool, grower, alfalfa(jar_1)).await.unwrap();
+        create(&pool, neighbour, alfalfa(jar_2)).await.unwrap();
+
+        let in_jar_1 = BatchFilter {
+            container_id: Some(jar_1),
+            ..Default::default()
+        };
+        let history = list(&pool, grower, in_jar_1).await.unwrap();
+        assert_eq!(history.len(), 2);
+        assert!(history.iter().all(|batch| batch.container == "jar 1"));
+
+        let all = containers::list(&pool, grower).await.unwrap();
+        let mine = all.iter().find(|container| container.id == jar_1).unwrap();
+        assert_eq!(mine.batch_count, 2);
+        assert_eq!(mine.occupant.as_ref().unwrap().batch_id, Some(current));
+
+        // The neighbour's batch shows who grows it, but not its id.
+        let theirs = all.iter().find(|container| container.id == jar_2).unwrap();
+        let occupant = theirs.occupant.as_ref().unwrap();
+        assert_eq!(occupant.grower, "neighbour");
+        assert_eq!(occupant.batch_id, None);
+
+        // Containers with history can't be deleted.
+        assert!(matches!(
+            containers::delete(&pool, jar_1).await,
+            Err(AppError::Conflict("container_has_history"))
+        ));
     }
 }

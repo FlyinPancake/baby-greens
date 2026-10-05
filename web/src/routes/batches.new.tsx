@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Minus, Plus, Sprout } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
+import { ContainerPicker } from '@/components/ContainerPicker'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { MobileActionBar } from '@/components/MobileActionBar'
 import { Highlight, PageHeading } from '@/components/PageHeading'
@@ -9,7 +10,7 @@ import { PlantPicker } from '@/components/PlantPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { api, batchesQuery, type LibraryEntry, plantsQuery, unwrap } from '@/lib/api'
+import { api, containersQuery, type LibraryEntry, plantsQuery, unwrap } from '@/lib/api'
 import { stepIcons } from '@/lib/icons'
 import { stepNames } from '@/lib/labels'
 import { planSteps } from '@/lib/plan'
@@ -17,8 +18,10 @@ import { formatWhen, formatWindow, toLocalInput } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/batches/new')({
-  validateSearch: (search: Record<string, unknown>): { plant?: string } =>
-    typeof search.plant === 'string' ? { plant: search.plant } : {},
+  validateSearch: (search: Record<string, unknown>): { plant?: string; container?: string } => ({
+    ...(typeof search.plant === 'string' ? { plant: search.plant } : {}),
+    ...(typeof search.container === 'string' ? { container: search.container } : {}),
+  }),
   component: NewBatch,
 })
 
@@ -46,20 +49,15 @@ const startPresets: StartPreset[] = [
   },
 ]
 
-const containerIdeas = {
-  sprout: ['jar 1', 'jar 2', 'jar 3', 'jar 4'],
-  microgreen: ['tray A', 'tray B', 'tray C', 'tray D'],
-}
-
 function NewBatch() {
   const search = Route.useSearch()
   const plants = useQuery(plantsQuery)
-  const active = useQuery(batchesQuery('active'))
+  const containers = useQuery(containersQuery)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
   const [plantSlug, setPlantSlug] = useState<string | null>(search.plant ?? null)
-  const [container, setContainer] = useState('')
+  const [containerId, setContainerId] = useState<string | null>(search.container ?? null)
   const [seed, setSeed] = useState<number | null>(null)
   const [startedAt, setStartedAt] = useState(() => toLocalInput(new Date()))
   const [startLabel, setStartLabel] = useState<string | null>('Now')
@@ -68,7 +66,11 @@ function NewBatch() {
 
   const entry = plants.data?.find((candidate) => candidate.slug === plantSlug)
   const seedG = seed ?? entry?.plant.seed_g ?? null
-  const inUse = new Set(active.data?.map((batch) => batch.container))
+  // A container picked earlier, or passed in the URL, stops counting once it's busy or archived.
+  const container = containers.data?.find(
+    (candidate) =>
+      candidate.id === containerId && !candidate.archived_at && candidate.occupant == null,
+  )
 
   function pickPlant(slug: string) {
     setPlantSlug(slug)
@@ -81,7 +83,7 @@ function NewBatch() {
         api.POST('/batches', {
           body: {
             plant_slug: plantSlug ?? '',
-            container,
+            container_id: container?.id ?? '',
             seed_g: seedG,
             started_at: new Date(startedAt).toISOString(),
             notes,
@@ -96,7 +98,7 @@ function NewBatch() {
   })
 
   const harvest = entry ? planSteps(entry.plant, new Date(startedAt))?.at(-1) : undefined
-  const ready = entry != null && container.trim() !== '' && seedG !== null && seedG > 0
+  const ready = entry != null && container != null && seedG !== null && seedG > 0
 
   return (
     <div className="flex flex-col gap-6 pb-24 lg:pb-0">
@@ -117,25 +119,17 @@ function NewBatch() {
 
           <Section number={2} title="Set it up" muted={!entry}>
             <Question label="Which jar or tray?">
-              <div className="flex flex-wrap gap-2">
-                {containerIdeas[entry?.plant.kind ?? 'sprout'].map((idea) => (
-                  <Chip
-                    key={idea}
-                    selected={container === idea}
-                    onClick={() => setContainer(idea)}
-                    note={inUse.has(idea) ? 'in use' : undefined}
-                  >
-                    {idea}
-                  </Chip>
-                ))}
-                <Input
-                  value={container}
-                  onChange={(event) => setContainer(event.target.value)}
-                  placeholder="or name it"
-                  aria-label="Jar or tray"
-                  className="h-9 w-36"
+              <ErrorAlert error={containers.error} />
+              {containers.data ? (
+                <ContainerPicker
+                  containers={containers.data}
+                  value={container?.id ?? null}
+                  onChange={setContainerId}
+                  preferredKind={entry?.plant.kind === 'microgreen' ? 'tray' : 'jar'}
                 />
-              </div>
+              ) : (
+                <p className="font-heading">Loading jars and trays...</p>
+              )}
             </Question>
 
             <Question label="How much seed?">
@@ -224,7 +218,7 @@ function NewBatch() {
 
         <Ticket
           entry={entry}
-          container={container}
+          container={container?.name ?? ''}
           seedG={seedG}
           startedAt={new Date(startedAt)}
           ready={ready}
@@ -295,12 +289,10 @@ function Question({ label, children }: { label: string; children: ReactNode }) {
 function Chip({
   selected,
   onClick,
-  note,
   children,
 }: {
   selected: boolean
   onClick: () => void
-  note?: string
   children: ReactNode
 }) {
   return (
@@ -314,7 +306,6 @@ function Chip({
       )}
     >
       {children}
-      {note && <span className="rounded-sm bg-due px-1 text-[10px] uppercase">{note}</span>}
     </button>
   )
 }
