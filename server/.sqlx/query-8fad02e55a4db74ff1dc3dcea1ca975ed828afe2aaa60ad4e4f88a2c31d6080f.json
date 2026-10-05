@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT b.id, b.plant_slug, b.plant AS \"plant: Json<Plant>\", b.container_id,\n               c.name AS container, b.seed_g, b.started_at, b.status AS \"status: BatchStatus\",\n               b.current_step, b.notes, s.started_at AS step_started_at\n        FROM batches b\n        JOIN containers c ON c.id = b.container_id\n        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step\n        WHERE b.id = $1 AND b.user_id = $2\n        ",
+  "query": "\n        SELECT b.id, b.plant_slug, b.plant AS \"plant: Json<Plant>\", b.container_id,\n               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS \"status: BatchStatus\",\n               b.current_step, b.notes, s.started_at AS step_started_at\n        FROM batches b\n        JOIN containers c ON c.id = b.container_id\n        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step\n        WHERE b.id = $1 AND b.user_id = $2\n        ",
   "describe": {
     "columns": [
       {
@@ -30,16 +30,21 @@
       },
       {
         "ordinal": 5,
+        "name": "container_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
         "name": "seed_g",
         "type_info": "Int4"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "started_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "status: BatchStatus",
         "type_info": {
           "Custom": {
@@ -55,17 +60,17 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "current_step",
         "type_info": "Int4"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "notes",
         "type_info": "Text"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "step_started_at",
         "type_info": "Timestamptz"
       }
@@ -82,6 +87,7 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       false,
@@ -90,5 +96,5 @@
       false
     ]
   },
-  "hash": "3b2b73ce5b4d956ea4a219aa9829804cb306822db8069044c7a93815dcdc4a06"
+  "hash": "8fad02e55a4db74ff1dc3dcea1ca975ed828afe2aaa60ad4e4f88a2c31d6080f"
 }

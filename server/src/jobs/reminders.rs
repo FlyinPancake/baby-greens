@@ -279,7 +279,7 @@ mod tests {
     }
 
     async fn alfalfa(pool: &PgPool, user_id: Uuid, jar: &str) -> Uuid {
-        let container_id = containers::create(pool, user_id, jar, ContainerKind::Jar, "")
+        let container_id = containers::create(pool, user_id, jar, ContainerKind::Jar, None, "")
             .await
             .unwrap();
         let slug: Slug = "alfalfa".parse().unwrap();

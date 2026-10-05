@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { api, type Container, type ContainerKind, unwrap } from '@/lib/api'
 import { containerIcons } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { ColorDot } from './ContainerColor'
 import { ErrorAlert } from './ErrorAlert'
 
 /**
@@ -56,6 +57,7 @@ export function ContainerPicker({
                 )}
               >
                 <Icon className="size-4" />
+                {container.color && <ColorDot color={container.color} />}
                 {container.name}
                 {busy && (
                   <span className="max-w-24 truncate rounded-sm bg-due px-1 text-[10px] uppercase">

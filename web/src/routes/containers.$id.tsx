@@ -2,13 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Sprout } from 'lucide-react'
 import { BatchCard } from '@/components/BatchCard'
+import { ContainerTile } from '@/components/ContainerColor'
 import { EmptyState } from '@/components/EmptyState'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { batchesQuery, type Container, containerQuery } from '@/lib/api'
 import { containerIcons } from '@/lib/icons'
-import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/containers/$id')({
   component: ContainerPage,
@@ -43,14 +43,11 @@ function ContainerHistory({ container }: { container: Container }) {
     <>
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={cn(
-              'grid size-12 -rotate-6 place-items-center rounded-base border-2 border-border shadow-shadow',
-              container.occupant ? 'bg-main' : 'bg-secondary-background',
-            )}
-          >
-            <Icon className="size-6" />
-          </span>
+          <ContainerTile
+            container={container}
+            className="size-12 -rotate-6 shadow-shadow"
+            iconClassName="size-6"
+          />
           <h1 className="text-4xl tracking-tight">{container.name}</h1>
           <Badge className="rotate-3 bg-due font-heading shadow-shadow">
             {container.archived_at ? 'archived' : container.occupant ? 'growing' : 'free'}

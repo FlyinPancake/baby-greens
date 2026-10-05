@@ -1298,6 +1298,13 @@
             "type": "string",
             "description": "The container's current name."
           },
+          "container_color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The container's colour, as `#rrggbb`."
+          },
           "container_id": {
             "type": "string",
             "format": "uuid"
@@ -1397,6 +1404,13 @@
             "format": "int64",
             "description": "How many batches this container has held, across the household."
           },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Lowercase `#rrggbb`, or none for clear glass and uncoloured trays."
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -1475,6 +1489,13 @@
           "kind"
         ],
         "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A colour like `#3b82f6`. Leave it out for clear glass."
+          },
           "kind": {
             "$ref": "#/components/schemas/ContainerKind"
           },
@@ -1897,6 +1918,12 @@
               "container": {
                 "type": "string"
               },
+              "container_color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "due_at": {
                 "type": "string",
                 "format": "date-time"
@@ -1971,6 +1998,13 @@
               "null"
             ],
             "description": "Archive or restore. Archived containers can't take new batches."
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A colour like `#3b82f6`, or null to remove it."
           },
           "kind": {
             "oneOf": [

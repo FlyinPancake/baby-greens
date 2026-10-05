@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Check, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { ColorDot } from '@/components/ContainerColor'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { stepIcons } from '@/lib/icons'
 import { TaskCard } from '@/components/TaskCard'
@@ -70,8 +71,9 @@ function Batch({ detail }: { detail: BatchDetail }) {
             <Link
               to="/containers/$id"
               params={{ id: batch.container_id }}
-              className="underline decoration-2 underline-offset-2"
+              className="inline-flex items-center gap-1.5 underline decoration-2 underline-offset-2"
             >
+              {batch.container_color && <ColorDot color={batch.container_color} />}
               {batch.container}
             </Link>
           </Fact>

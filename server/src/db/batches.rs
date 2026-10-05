@@ -34,6 +34,8 @@ pub struct BatchSummary {
     pub container_id: Uuid,
     /// The container's current name.
     pub container: String,
+    /// The container's colour, as `#rrggbb`.
+    pub container_color: Option<String>,
     pub seed_g: i32,
     #[serde(with = "time::serde::rfc3339")]
     pub started_at: OffsetDateTime,
@@ -93,6 +95,7 @@ pub struct TaskView {
     #[serde(with = "time::serde::rfc3339::option")]
     pub snoozed_until: Option<OffsetDateTime>,
     pub container: String,
+    pub container_color: Option<String>,
     pub plant_name: String,
 }
 
@@ -112,6 +115,7 @@ struct BatchRow {
     plant: Json<Plant>,
     container_id: Uuid,
     container: String,
+    container_color: Option<String>,
     seed_g: i32,
     started_at: OffsetDateTime,
     status: BatchStatus,
@@ -145,6 +149,7 @@ impl BatchRow {
             plant_kind: plant.kind,
             container_id: self.container_id,
             container: self.container.clone(),
+            container_color: self.container_color.clone(),
             seed_g: self.seed_g,
             started_at: self.started_at,
             status: self.status,
@@ -180,7 +185,7 @@ pub async fn list(
         BatchRow,
         r#"
         SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container_id,
-               c.name AS container, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
+               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
                b.current_step, b.notes, s.started_at AS step_started_at
         FROM batches b
         JOIN containers c ON c.id = b.container_id
@@ -205,7 +210,7 @@ pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail,
         BatchRow,
         r#"
         SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container_id,
-               c.name AS container, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
+               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
                b.current_step, b.notes, s.started_at AS step_started_at
         FROM batches b
         JOIN containers c ON c.id = b.container_id
@@ -275,7 +280,8 @@ pub async fn open_tasks(
         r#"
         SELECT t.id, t.batch_id, t.step_index, t.kind::text AS "kind!", t.action,
                coalesce(t.snoozed_until, t.due_at) AS "due_at!", t.overdue_at, t.snoozed_until,
-               c.name AS container, b.plant ->> 'name' AS "plant_name!"
+               c.name AS container, c.color AS container_color,
+               b.plant ->> 'name' AS "plant_name!"
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
         JOIN containers c ON c.id = b.container_id
@@ -310,6 +316,7 @@ pub async fn open_tasks(
                 overdue_at: row.overdue_at,
                 snoozed_until: row.snoozed_until,
                 container: row.container,
+                container_color: row.container_color,
                 plant_name: row.plant_name,
             })
         })
@@ -649,7 +656,7 @@ mod tests {
     }
 
     async fn jar(pool: &PgPool, user_id: Uuid, name: &str) -> Uuid {
-        containers::create(pool, user_id, name, ContainerKind::Jar, "")
+        containers::create(pool, user_id, name, ContainerKind::Jar, None, "")
             .await
             .unwrap()
     }

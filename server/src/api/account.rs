@@ -1,9 +1,9 @@
 use axum::extract::State;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use super::extract::Json;
+use super::extract::{Json, present};
 use crate::{
     AppState,
     auth::AuthUser,
@@ -41,15 +41,6 @@ struct UpdateMe {
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<QuietHours>)]
     quiet_hours: Option<Option<QuietHours>>,
-}
-
-/// Tells a missing field (outer `None`) apart from an explicit `null` (`Some(None)`).
-fn present<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: Deserialize<'de>,
-    D: Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 /// Change your timezone or quiet hours.

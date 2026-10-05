@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { deleteTestPlant, saveTestPlant, testPlantName } from './fixtures'
 
 /**
  * Makes sure this project's test jar exists and isn't archived, and returns its name. Reusing one
@@ -44,16 +45,17 @@ const plantPicker = (page: Page) => page.getByRole('radiogroup', { name: 'Plant'
 
 test('start a batch, advance it, and discard it', async ({ page }, testInfo) => {
   const jar = await testJar(page, testInfo.project.name)
+  const plant = await saveTestPlant(page, testInfo.project.name)
   page.on('dialog', (dialog) => dialog.accept())
 
   await page.goto('/batches/new')
-  await plantPicker(page).getByRole('radio', { name: /Mung bean sprouts/ }).click()
+  await plantPicker(page).getByRole('radio', { name: new RegExp(testPlantName) }).click()
   await page.getByRole('radio', { name: jar }).click()
   await expect(page.getByRole('spinbutton', { name: 'Seed in grams' })).toHaveValue('60')
   await page.getByRole('button', { name: /Start/ }).last().click()
 
   // The new batch page, soaking, with the drain task waiting.
-  await expect(page.getByRole('heading', { name: 'Mung bean sprouts' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: testPlantName })).toBeVisible()
   await expect(page.getByText('You are here')).toBeVisible()
   await page.getByRole('button', { name: 'Mark "Drain the soak water" done' }).click()
 
@@ -83,6 +85,7 @@ test('start a batch, advance it, and discard it', async ({ page }, testInfo) => 
   await expect(card.getByText('Free')).toBeVisible()
   await card.getByRole('button', { name: 'Archive' }).click()
   await expect(card.getByRole('button', { name: 'Archive' })).toHaveCount(0)
+  await deleteTestPlant(page, plant)
 })
 
 test('a busy jar is shown but cannot be picked', async ({ page }) => {

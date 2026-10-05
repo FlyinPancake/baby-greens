@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Amphora, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { ContainerCard } from '@/components/ContainerCard'
+import { ColorPicker } from '@/components/ContainerColor'
 import { EmptyState } from '@/components/EmptyState'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { Highlight, PageHeading } from '@/components/PageHeading'
@@ -10,7 +11,7 @@ import { Segmented } from '@/components/Segmented'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api, type ContainerKind, containersQuery, unwrap } from '@/lib/api'
-import { containerKindOptions } from '@/lib/icons'
+import { containerKindOptions, Jar } from '@/lib/icons'
 
 export const Route = createFileRoute('/containers/')({
   component: Containers,
@@ -42,7 +43,7 @@ function Containers() {
       {containers.isPending ? (
         <p className="font-heading">Loading...</p>
       ) : current.length === 0 ? (
-        <EmptyState icon={Amphora} title="No jars or trays yet">
+        <EmptyState icon={Jar} title="No jars or trays yet">
           Add the jars and trays you grow in, then pick them when you start a batch.
         </EmptyState>
       ) : (
@@ -71,12 +72,14 @@ function AddContainer() {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [kind, setKind] = useState<ContainerKind>('jar')
+  const [color, setColor] = useState<string | null>(null)
 
   const add = useMutation({
-    mutationFn: () => unwrap(api.POST('/containers', { body: { name, kind } })),
+    mutationFn: () => unwrap(api.POST('/containers', { body: { name, kind, color } })),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['containers'] })
       setName('')
+      setColor(null)
     },
   })
 
@@ -107,6 +110,7 @@ function AddContainer() {
           </Button>
         </div>
       </div>
+      <ColorPicker value={color} onChange={setColor} />
       <ErrorAlert error={add.error} />
     </form>
   )

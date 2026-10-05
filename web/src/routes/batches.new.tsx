@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Minus, Plus, Sprout } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { ContainerPicker } from '@/components/ContainerPicker'
+import { ColorDot } from '@/components/ContainerColor'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { MobileActionBar } from '@/components/MobileActionBar'
 import { Highlight, PageHeading } from '@/components/PageHeading'
@@ -219,6 +220,7 @@ function NewBatch() {
         <Ticket
           entry={entry}
           container={container?.name ?? ''}
+          containerColor={container?.color ?? null}
           seedG={seedG}
           startedAt={new Date(startedAt)}
           ready={ready}
@@ -314,6 +316,7 @@ function Chip({
 function Ticket({
   entry,
   container,
+  containerColor,
   seedG,
   startedAt,
   ready,
@@ -323,6 +326,7 @@ function Ticket({
 }: {
   entry: LibraryEntry | undefined
   container: string
+  containerColor: string | null
   seedG: number | null
   startedAt: Date
   ready: boolean
@@ -340,7 +344,8 @@ function Ticket({
         <>
           <div>
             <p className="text-2xl font-heading leading-tight">{entry.plant.name}</p>
-            <p className="text-sm">
+            <p className="flex items-center gap-1.5 text-sm">
+              {containerColor && <ColorDot color={containerColor} />}
               {container.trim() || 'pick a jar or tray'} · {seedG ? `${seedG} g` : 'no seed amount'}
             </p>
           </div>

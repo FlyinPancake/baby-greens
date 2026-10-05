@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT t.id, t.batch_id, t.step_index, t.kind::text AS \"kind!\", t.action,\n               coalesce(t.snoozed_until, t.due_at) AS \"due_at!\", t.overdue_at, t.snoozed_until,\n               c.name AS container, b.plant ->> 'name' AS \"plant_name!\"\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        JOIN containers c ON c.id = b.container_id\n        WHERE b.user_id = $1\n          AND b.status = 'active'\n          AND t.done_at IS NULL\n          AND ($2::timestamptz IS NULL OR coalesce(t.snoozed_until, t.due_at) <= $2)\n          AND ($3::uuid IS NULL OR t.batch_id = $3)\n        ORDER BY coalesce(t.snoozed_until, t.due_at), t.id\n        ",
+  "query": "\n        SELECT t.id, t.batch_id, t.step_index, t.kind::text AS \"kind!\", t.action,\n               coalesce(t.snoozed_until, t.due_at) AS \"due_at!\", t.overdue_at, t.snoozed_until,\n               c.name AS container, c.color AS container_color,\n               b.plant ->> 'name' AS \"plant_name!\"\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        JOIN containers c ON c.id = b.container_id\n        WHERE b.user_id = $1\n          AND b.status = 'active'\n          AND t.done_at IS NULL\n          AND ($2::timestamptz IS NULL OR coalesce(t.snoozed_until, t.due_at) <= $2)\n          AND ($3::uuid IS NULL OR t.batch_id = $3)\n        ORDER BY coalesce(t.snoozed_until, t.due_at), t.id\n        ",
   "describe": {
     "columns": [
       {
@@ -50,6 +50,11 @@
       },
       {
         "ordinal": 9,
+        "name": "container_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
         "name": "plant_name!",
         "type_info": "Text"
       }
@@ -71,8 +76,9 @@
       true,
       true,
       false,
+      true,
       null
     ]
   },
-  "hash": "24767303caeb949651fa5cd205617c08d5df6348a5255b9d6222029a98c42e16"
+  "hash": "1a3de32dfb77814230922d0030fad9d1cb32cb4c0fb35b8774653cdf33841a3a"
 }

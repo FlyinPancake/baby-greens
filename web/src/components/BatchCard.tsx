@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { ColorDot } from '@/components/ContainerColor'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { BatchSummary } from '@/lib/api'
@@ -24,7 +25,10 @@ export function BatchCard({ batch }: { batch: BatchSummary }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate font-heading text-lg">{batch.plant_name}</p>
-            <p className="text-sm">{batch.container}</p>
+            <p className="flex items-center gap-1.5 text-sm">
+              {batch.container_color && <ColorDot color={batch.container_color} />}
+              {batch.container}
+            </p>
           </div>
           <Badge className={batch.plant_kind === 'sprout' ? 'bg-due' : 'bg-chart-3 text-white'}>
             {batch.plant_kind === 'sprout' ? 'sprout' : 'microgreen'}

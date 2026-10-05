@@ -9,6 +9,7 @@ import { taskLabel } from '@/lib/labels'
 import { formatWhen } from '@/lib/time'
 import { useNow } from '@/lib/useNow'
 import { cn } from '@/lib/utils'
+import { ColorDot } from './ContainerColor'
 import { ErrorAlert } from './ErrorAlert'
 import { TaskIcon } from './TaskIcon'
 
@@ -91,7 +92,11 @@ export function TaskCard({ task, showBatch = true }: { task: TaskView; showBatch
                   params={{ id: task.batch_id }}
                   className="underline decoration-2 underline-offset-2 hover:bg-main"
                 >
-                  {task.plant_name}, {task.container}
+                  {task.plant_name},{' '}
+                  {task.container_color && (
+                    <ColorDot color={task.container_color} className="mr-1 align-[-1px]" />
+                  )}
+                  {task.container}
                 </Link>
                 {' · '}
               </>

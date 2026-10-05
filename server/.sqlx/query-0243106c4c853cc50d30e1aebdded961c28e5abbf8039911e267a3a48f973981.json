@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE containers SET\n            name = coalesce($2, name),\n            kind = coalesce($3, kind),\n            notes = coalesce($4, notes),\n            color = CASE WHEN $7 THEN NULL ELSE coalesce($8, color) END,\n            archived_at = CASE\n                WHEN $5::boolean IS NULL THEN archived_at\n                WHEN $5 THEN coalesce(archived_at, $6)\n                ELSE NULL\n            END\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        {
+          "Custom": {
+            "name": "container_kind",
+            "kind": {
+              "Enum": [
+                "jar",
+                "tray"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Bool",
+        "Timestamptz",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0243106c4c853cc50d30e1aebdded961c28e5abbf8039911e267a3a48f973981"
+}

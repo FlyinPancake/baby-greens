@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { api, type Container, type ContainerKind, unwrap } from '@/lib/api'
-import { containerIcons, containerKindOptions } from '@/lib/icons'
+import { containerKindOptions } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { ColorPicker, ContainerTile } from './ContainerColor'
 import { ErrorAlert } from './ErrorAlert'
 import { Segmented } from './Segmented'
 
@@ -15,7 +16,6 @@ import { Segmented } from './Segmented'
 export function ContainerCard({ container }: { container: Container }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
-  const Icon = containerIcons[container.kind]
   const archived = container.archived_at != null
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['containers'] })
@@ -24,6 +24,7 @@ export function ContainerCard({ container }: { container: Container }) {
     mutationFn: (body: {
       name?: string
       kind?: ContainerKind
+      color?: string | null
       notes?: string
       archived?: boolean
     }) =>
@@ -63,14 +64,7 @@ export function ContainerCard({ container }: { container: Container }) {
       )}
     >
       <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            'grid size-10 shrink-0 place-items-center rounded-base border-2 border-border',
-            container.occupant ? 'bg-main' : 'bg-background',
-          )}
-        >
-          <Icon className="size-5" />
-        </span>
+        <ContainerTile container={container} className="size-10" />
         <div className="min-w-0 flex-1">
           <Link
             to="/containers/$id"
@@ -168,16 +162,22 @@ function EditContainer({
   container: Container
   pending: boolean
   error: Error | null
-  onSave: (changes: { name: string; kind: ContainerKind; notes: string }) => void
+  onSave: (changes: {
+    name: string
+    kind: ContainerKind
+    color: string | null
+    notes: string
+  }) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState(container.name)
   const [kind, setKind] = useState<ContainerKind>(container.kind)
+  const [color, setColor] = useState<string | null>(container.color ?? null)
   const [notes, setNotes] = useState(container.notes)
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    onSave({ name, kind, notes })
+    onSave({ name, kind, color, notes })
   }
 
   return (
@@ -191,6 +191,7 @@ function EditContainer({
           autoFocus
         />
         <Segmented label="Kind" value={kind} onChange={setKind} options={containerKindOptions} />
+        <ColorPicker value={color} onChange={setColor} />
         <Textarea
           value={notes}
           onChange={(event) => setNotes(event.target.value)}

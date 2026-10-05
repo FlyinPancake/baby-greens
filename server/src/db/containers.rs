@@ -21,6 +21,8 @@ pub struct Container {
     pub id: Uuid,
     pub name: String,
     pub kind: ContainerKind,
+    /// Lowercase `#rrggbb`, or none for clear glass and uncoloured trays.
+    pub color: Option<String>,
     pub notes: String,
     #[serde(with = "time::serde::rfc3339::option")]
     pub archived_at: Option<OffsetDateTime>,
@@ -52,6 +54,19 @@ fn name_conflict(error: sqlx::Error) -> AppError {
     }
 }
 
+/// Checks a `#rrggbb` colour and lowercases it.
+fn clean_color(color: &str) -> Result<String, AppError> {
+    let color = color.trim().to_ascii_lowercase();
+    let valid = color.len() == 7
+        && color.starts_with('#')
+        && color[1..].bytes().all(|byte| byte.is_ascii_hexdigit());
+    if valid {
+        Ok(color)
+    } else {
+        Err(AppError::invalid("color", "must be a colour like #3b82f6"))
+    }
+}
+
 fn clean_name(name: &str) -> Result<String, AppError> {
     let name = name.trim();
     if name.is_empty() {
@@ -68,7 +83,7 @@ fn clean_name(name: &str) -> Result<String, AppError> {
 pub async fn list(pool: &PgPool, viewer: Uuid) -> Result<Vec<Container>, AppError> {
     let rows = sqlx::query!(
         r#"
-        SELECT c.id, c.name, c.kind AS "kind: ContainerKind", c.notes, c.archived_at,
+        SELECT c.id, c.name, c.kind AS "kind: ContainerKind", c.color, c.notes, c.archived_at,
                (SELECT count(*) FROM batches b WHERE b.container_id = c.id) AS "batch_count!",
                a.id AS "active_id?", a.user_id AS "active_user?",
                a.plant ->> 'name' AS "active_plant?", u.display_name AS "active_grower?"
@@ -87,6 +102,7 @@ pub async fn list(pool: &PgPool, viewer: Uuid) -> Result<Vec<Container>, AppErro
             id: row.id,
             name: row.name,
             kind: row.kind,
+            color: row.color,
             notes: row.notes,
             archived_at: row.archived_at,
             batch_count: row.batch_count,
@@ -112,17 +128,20 @@ pub async fn create(
     user_id: Uuid,
     name: &str,
     kind: ContainerKind,
+    color: Option<&str>,
     notes: &str,
 ) -> Result<Uuid, AppError> {
     let name = clean_name(name)?;
+    let color = color.map(clean_color).transpose()?;
     sqlx::query_scalar!(
         r#"
-        INSERT INTO containers (name, kind, notes, created_by)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO containers (name, kind, color, notes, created_by)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING id
         "#,
         name,
         kind as ContainerKind,
+        color,
         notes.trim(),
         user_id,
     )
@@ -136,6 +155,8 @@ pub async fn create(
 pub struct ContainerChanges {
     pub name: Option<String>,
     pub kind: Option<ContainerKind>,
+    /// `Some(None)` removes the colour.
+    pub color: Option<Option<String>>,
     pub notes: Option<String>,
     pub archived: Option<bool>,
 }
@@ -147,6 +168,13 @@ pub async fn update(
     now: OffsetDateTime,
 ) -> Result<(), AppError> {
     let name = changes.name.as_deref().map(clean_name).transpose()?;
+    let clear_color = matches!(changes.color, Some(None));
+    let color = changes
+        .color
+        .flatten()
+        .as_deref()
+        .map(clean_color)
+        .transpose()?;
     let mut tx = pool.begin().await?;
 
     let current = sqlx::query!(
@@ -173,6 +201,7 @@ pub async fn update(
             name = coalesce($2, name),
             kind = coalesce($3, kind),
             notes = coalesce($4, notes),
+            color = CASE WHEN $7 THEN NULL ELSE coalesce($8, color) END,
             archived_at = CASE
                 WHEN $5::boolean IS NULL THEN archived_at
                 WHEN $5 THEN coalesce(archived_at, $6)
@@ -186,6 +215,8 @@ pub async fn update(
         changes.notes.as_deref().map(str::trim),
         changes.archived,
         now,
+        clear_color,
+        color,
     )
     .execute(&mut *tx)
     .await
@@ -244,16 +275,16 @@ mod tests {
     #[sqlx::test]
     async fn names_are_unique_ignoring_case(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
-        create(&pool, user_id, "Jar 2", ContainerKind::Jar, "")
+        create(&pool, user_id, "Jar 2", ContainerKind::Jar, None, "")
             .await
             .unwrap();
 
-        let duplicate = create(&pool, user_id, "  jar 2 ", ContainerKind::Jar, "").await;
+        let duplicate = create(&pool, user_id, "  jar 2 ", ContainerKind::Jar, None, "").await;
         assert!(
             matches!(duplicate, Err(AppError::Invalid(problems)) if problems[0].path == "name")
         );
 
-        let other = create(&pool, user_id, "jar 3", ContainerKind::Jar, "")
+        let other = create(&pool, user_id, "jar 3", ContainerKind::Jar, None, "")
             .await
             .unwrap();
         let rename = ContainerChanges {
@@ -269,14 +300,14 @@ mod tests {
     #[sqlx::test]
     async fn blank_names_are_rejected(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
-        let blank = create(&pool, user_id, "   ", ContainerKind::Tray, "").await;
+        let blank = create(&pool, user_id, "   ", ContainerKind::Tray, None, "").await;
         assert!(matches!(blank, Err(AppError::Invalid(_))));
     }
 
     #[sqlx::test]
     async fn archive_restore_and_delete(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
-        let id = create(&pool, user_id, "tray A", ContainerKind::Tray, "")
+        let id = create(&pool, user_id, "tray A", ContainerKind::Tray, None, "")
             .await
             .unwrap();
 
@@ -302,5 +333,54 @@ mod tests {
             find(&pool, user_id, id).await,
             Err(AppError::NotFound)
         ));
+    }
+
+    #[sqlx::test]
+    async fn colours_are_checked_set_and_cleared(pool: PgPool) {
+        let user_id = user(&pool, "grower").await;
+        let id = create(
+            &pool,
+            user_id,
+            "jar 1",
+            ContainerKind::Jar,
+            Some(" #3B82F6 "),
+            "",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            find(&pool, user_id, id).await.unwrap().color.as_deref(),
+            Some("#3b82f6")
+        );
+
+        for bad in ["blue", "#3b82f", "#3b82f6ff", "3b82f6", "#gggggg"] {
+            let result = create(&pool, user_id, "jar 2", ContainerKind::Jar, Some(bad), "").await;
+            assert!(matches!(result, Err(AppError::Invalid(_))), "{bad}");
+        }
+
+        let recolor = ContainerChanges {
+            color: Some(Some("#EF4444".into())),
+            ..Default::default()
+        };
+        update(&pool, id, recolor, NOW).await.unwrap();
+        assert_eq!(
+            find(&pool, user_id, id).await.unwrap().color.as_deref(),
+            Some("#ef4444")
+        );
+
+        // Leaving the colour out keeps it, and null clears it.
+        update(&pool, id, ContainerChanges::default(), NOW)
+            .await
+            .unwrap();
+        assert_eq!(
+            find(&pool, user_id, id).await.unwrap().color.as_deref(),
+            Some("#ef4444")
+        );
+        let clear = ContainerChanges {
+            color: Some(None),
+            ..Default::default()
+        };
+        update(&pool, id, clear, NOW).await.unwrap();
+        assert_eq!(find(&pool, user_id, id).await.unwrap().color, None);
     }
 }

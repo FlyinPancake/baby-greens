@@ -278,6 +278,8 @@ export interface components {
         BatchSummary: {
             /** @description The container's current name. */
             container: string;
+            /** @description The container's colour, as `#rrggbb`. */
+            container_color?: string | null;
             /** Format: uuid */
             container_id: string;
             current_action: components["schemas"]["StepAction"];
@@ -311,6 +313,8 @@ export interface components {
              * @description How many batches this container has held, across the household.
              */
             batch_count: number;
+            /** @description Lowercase `#rrggbb`, or none for clear glass and uncoloured trays. */
+            color?: string | null;
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["ContainerKind"];
@@ -340,6 +344,8 @@ export interface components {
             started_at?: string | null;
         };
         CreateContainer: {
+            /** @description A colour like `#3b82f6`. Leave it out for clear glass. */
+            color?: string | null;
             kind: components["schemas"]["ContainerKind"];
             /** @description Unique in the household, ignoring case. */
             name: string;
@@ -483,6 +489,7 @@ export interface components {
             /** Format: uuid */
             batch_id: string;
             container: string;
+            container_color?: string | null;
             /** Format: date-time */
             due_at: string;
             /** Format: uuid */
@@ -510,6 +517,8 @@ export interface components {
         UpdateContainer: {
             /** @description Archive or restore. Archived containers can't take new batches. */
             archived?: boolean | null;
+            /** @description A colour like `#3b82f6`, or null to remove it. */
+            color?: string | null;
             kind?: components["schemas"]["ContainerKind"] | null;
             name?: string | null;
             notes?: string | null;

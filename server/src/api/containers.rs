@@ -5,7 +5,7 @@ use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-use super::extract::{Json, Path};
+use super::extract::{Json, Path, present};
 use crate::{
     AppState,
     auth::AuthUser,
@@ -43,6 +43,8 @@ struct CreateContainer {
     /// Unique in the household, ignoring case.
     name: String,
     kind: ContainerKind,
+    /// A colour like `#3b82f6`. Leave it out for clear glass.
+    color: Option<String>,
     #[serde(default)]
     notes: String,
 }
@@ -71,6 +73,7 @@ async fn create_container(
         user.id,
         &request.name,
         request.kind,
+        request.color.as_deref(),
         &request.notes,
     )
     .await?;
@@ -104,6 +107,10 @@ async fn get_container(
 struct UpdateContainer {
     name: Option<String>,
     kind: Option<ContainerKind>,
+    /// A colour like `#3b82f6`, or null to remove it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>)]
+    color: Option<Option<String>>,
     notes: Option<String>,
     /// Archive or restore. Archived containers can't take new batches.
     archived: Option<bool>,
@@ -135,6 +142,7 @@ async fn update_container(
     let changes = ContainerChanges {
         name: request.name,
         kind: request.kind,
+        color: request.color,
         notes: request.notes,
         archived: request.archived,
     };

@@ -177,7 +177,7 @@ ApiToken       (id, user, name, token_hash, last_used_at?, created_at)   -- late
 PushSubscription (id, user, endpoint, p256dh, auth, user_agent, created_at)
 
 CustomPlant    (slug PK, definition jsonb, created_by?, created_at, updated_at)
-Container      (id, name unique ignoring case, kind: jar|tray, notes, created_by?,
+Container      (id, name unique ignoring case, kind: jar|tray, color?, notes, created_by?,
                 created_at, archived_at?)
 Batch          (id, user, plant_slug, plant jsonb, current_step, container_id, seed_g,
                 started_at, status, notes)
