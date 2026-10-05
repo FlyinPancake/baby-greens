@@ -1,0 +1,72 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT t.id, t.batch_id, t.step_index, t.kind::text AS \"kind!\", t.action,\n               coalesce(t.snoozed_until, t.due_at) AS \"due_at!\", t.overdue_at,\n               b.container, b.plant ->> 'name' AS \"plant_name!\"\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        WHERE b.user_id = $1\n          AND b.status = 'active'\n          AND t.done_at IS NULL\n          AND ($2::timestamptz IS NULL OR coalesce(t.snoozed_until, t.due_at) <= $2)\n          AND ($3::uuid IS NULL OR t.batch_id = $3)\n        ORDER BY coalesce(t.snoozed_until, t.due_at), t.id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "batch_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "step_index",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "kind!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "action",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "due_at!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "overdue_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "container",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "plant_name!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      null,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "082238776dbb05f3e86ec944cb4de4ad55c7b3e01da46c8e2c8f0e4483fdffba"
+}

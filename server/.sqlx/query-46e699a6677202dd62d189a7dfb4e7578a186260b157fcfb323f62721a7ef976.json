@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE batch_steps SET ended_at = greatest(started_at, $3)\n        WHERE batch_id = $1 AND step_index = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "46e699a6677202dd62d189a7dfb4e7578a186260b157fcfb323f62721a7ef976"
+}

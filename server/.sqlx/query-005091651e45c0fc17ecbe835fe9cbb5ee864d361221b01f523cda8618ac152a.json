@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT current_step, status AS \"status: BatchStatus\"\n        FROM batches WHERE id = $1 AND user_id = $2\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "current_step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "status: BatchStatus",
+        "type_info": {
+          "Custom": {
+            "name": "batch_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "harvested",
+                "discarded"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "005091651e45c0fc17ecbe835fe9cbb5ee864d361221b01f523cda8618ac152a"
+}

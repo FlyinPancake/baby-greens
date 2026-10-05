@@ -1,0 +1,1165 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "baby-greens",
+    "description": "Sprout and microgreen tracker",
+    "license": {
+      "name": ""
+    },
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "paths": {
+    "/batches": {
+      "get": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "List your batches, newest first.",
+        "operationId": "list_batches",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only return batches with this status.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/BatchStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BatchSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "Start a batch. The server copies the plant's current definition into the batch and\nschedules the first step's tasks.",
+        "operationId": "create_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/batches/{id}": {
+      "get": {
+        "tags": [
+          "batches"
+        ],
+        "operationId": "get_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/batches/{id}/discard": {
+      "post": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "Stop an active batch early, for example because it molded.",
+        "operationId": "discard_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Discarded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The batch isn't active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "The signed-in user.",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/plants": {
+      "get": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "List every plant: built-in ones, custom ones, and custom overrides of built-in ones.",
+        "operationId": "list_plants",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LibraryEntry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/plants/{slug}": {
+      "get": {
+        "tags": [
+          "plants"
+        ],
+        "operationId": "get_plant",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Create or replace a custom plant. Using a built-in slug overrides the built-in plant for\neveryone on the server.",
+        "operationId": "put_plant",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Plant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body isn't a plant definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The definition breaks a rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "plants"
+        ],
+        "summary": "Delete a custom plant. For an override, the built-in plant comes back. Running batches keep\ntheir copy of the definition.",
+        "operationId": "delete_plant",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Slug"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No custom plant has this slug",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/tasks": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "List open tasks on your active batches, soonest first.",
+        "operationId": "list_tasks",
+        "parameters": [
+          {
+            "name": "due_before",
+            "in": "query",
+            "description": "Only return tasks due at or before this time, like the end of the user's day.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskView"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/tasks/{id}/complete": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Mark a task done. Finishing a care task schedules the next one. Finishing an advance task\nmoves the batch into its next step, and moving into harvest ends the batch.",
+        "operationId": "complete_task",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The task is already done (`task_done`), or its batch has moved on (`batch_not_active`, `stale_task`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BatchDetail": {
+        "type": "object",
+        "required": [
+          "batch",
+          "notes",
+          "plant",
+          "steps",
+          "upcoming",
+          "open_tasks"
+        ],
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/BatchSummary"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "open_tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskView"
+            }
+          },
+          "plant": {
+            "$ref": "#/components/schemas/Plant",
+            "description": "The plant definition as it was when the batch started."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepRecord"
+            },
+            "description": "The steps the batch has been in, with actual times."
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepWindow"
+            },
+            "description": "Planned windows from the current step to harvest. Empty unless the batch is active."
+          }
+        }
+      },
+      "BatchStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "harvested",
+          "discarded"
+        ]
+      },
+      "BatchSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "plant_slug",
+          "plant_name",
+          "plant_kind",
+          "container",
+          "seed_g",
+          "started_at",
+          "status",
+          "current_step",
+          "current_action",
+          "step_started_at"
+        ],
+        "properties": {
+          "container": {
+            "type": "string"
+          },
+          "current_action": {
+            "$ref": "#/components/schemas/StepAction"
+          },
+          "current_step": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "harvest_window": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HarvestWindow",
+                "description": "When the batch should be ready, counted from when the current step actually started. Only\nset for active batches."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plant_kind": {
+            "$ref": "#/components/schemas/PlantKind"
+          },
+          "plant_name": {
+            "type": "string"
+          },
+          "plant_slug": {
+            "type": "string"
+          },
+          "seed_g": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BatchStatus"
+          },
+          "step_started_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Care": {
+        "type": "object",
+        "required": [
+          "action",
+          "every"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/CareAction"
+          },
+          "every": {
+            "type": "string",
+            "example": "12h"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CareAction": {
+        "type": "string",
+        "enum": [
+          "rinse",
+          "water",
+          "mist"
+        ]
+      },
+      "CreateBatch": {
+        "type": "object",
+        "required": [
+          "plant_slug",
+          "container"
+        ],
+        "properties": {
+          "container": {
+            "type": "string",
+            "description": "Which jar or tray, like \"jar 2\" or \"tray A\"."
+          },
+          "notes": {
+            "type": "string"
+          },
+          "plant_slug": {
+            "$ref": "#/components/schemas/Slug"
+          },
+          "seed_g": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Seed weight in grams. Defaults to the plant's `seed_g`.",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the first step started. Defaults to now. Can't be in the future."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorBody": {
+        "type": "object",
+        "description": "The body of every error response.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "A stable code, like `not_found`, `invalid`, or `task_done`."
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "description": "For `invalid`, what's wrong with each field."
+          }
+        }
+      },
+      "HarvestWindow": {
+        "type": "object",
+        "required": [
+          "earliest",
+          "latest"
+        ],
+        "properties": {
+          "earliest": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latest": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LibraryEntry": {
+        "type": "object",
+        "required": [
+          "slug",
+          "source",
+          "plant"
+        ],
+        "properties": {
+          "plant": {
+            "$ref": "#/components/schemas/Plant"
+          },
+          "slug": {
+            "$ref": "#/components/schemas/Slug"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          }
+        }
+      },
+      "Plant": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "steps"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/PlantKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "name_lat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed_g": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Suggested seed weight for one jar or tray, in grams.",
+            "minimum": 0
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlantKind": {
+        "type": "string",
+        "enum": [
+          "sprout",
+          "microgreen"
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "description": "One thing wrong with a plant definition. `path` points at the field, like `steps[1].care[0]`.",
+        "required": [
+          "path",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "Slug": {
+        "type": "string",
+        "description": "A plant's id, like `mung-bean`. Lowercase letters, digits, and single hyphens, at most 64\ncharacters.",
+        "example": "mung-bean",
+        "maxLength": 64,
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "Source": {
+        "type": "string",
+        "enum": [
+          "builtin",
+          "custom",
+          "override"
+        ]
+      },
+      "Step": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/StepAction"
+          },
+          "care": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Care"
+            },
+            "description": "Chores that repeat while the batch is in this step."
+          },
+          "duration_max": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the step is overdue. Leave it out for a step with a fixed length.",
+            "example": "12h"
+          },
+          "duration_min": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the step can end at the earliest. Required for every step except harvest.",
+            "example": "8h"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "StepAction": {
+        "type": "string",
+        "enum": [
+          "soak",
+          "sprout",
+          "blackout",
+          "light",
+          "harvest"
+        ]
+      },
+      "StepRecord": {
+        "type": "object",
+        "required": [
+          "step_index",
+          "action",
+          "started_at"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/StepAction"
+          },
+          "ended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "step_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "StepWindow": {
+        "type": "object",
+        "description": "When a step should start if every step before it takes its shortest or longest time.",
+        "required": [
+          "step_index",
+          "action",
+          "earliest_start",
+          "latest_start"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/StepAction"
+          },
+          "earliest_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latest_start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "step_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "TaskAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Move the batch into the next step, whose action this is.",
+            "required": [
+              "action",
+              "kind"
+            ],
+            "properties": {
+              "action": {
+                "$ref": "#/components/schemas/StepAction",
+                "description": "Move the batch into the next step, whose action this is."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "advance"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "action",
+              "kind"
+            ],
+            "properties": {
+              "action": {
+                "$ref": "#/components/schemas/CareAction"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "care"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Serializes as `{ \"kind\": \"advance\", \"action\": \"light\" }` or `{ \"kind\": \"care\", \"action\": \"rinse\" }`."
+      },
+      "TaskView": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/TaskAction"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "batch_id",
+              "step_index",
+              "due_at",
+              "container",
+              "plant_name"
+            ],
+            "properties": {
+              "batch_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "container": {
+                "type": "string"
+              },
+              "due_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "overdue_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "plant_name": {
+                "type": "string"
+              },
+              "step_index": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        ]
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "timezone"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "bg_session"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "account",
+      "description": "The signed-in user"
+    },
+    {
+      "name": "plants",
+      "description": "The plant library"
+    },
+    {
+      "name": "batches",
+      "description": "Jars and trays you're growing"
+    },
+    {
+      "name": "tasks",
+      "description": "Chores and step changes"
+    }
+  ]
+}

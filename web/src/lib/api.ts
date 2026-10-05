@@ -1,31 +1,96 @@
-// Hand-written until milestone 4 replaces this with a client generated from the OpenAPI spec.
-
 import { queryOptions } from '@tanstack/react-query'
+import createClient from 'openapi-fetch'
+import type { components, paths } from './api.gen'
 
-export type Me = {
-  id: string
-  display_name: string
-  email: string | null
-  timezone: string
+export type Schemas = components['schemas']
+export type Me = Schemas['User']
+export type LibraryEntry = Schemas['LibraryEntry']
+export type Plant = Schemas['Plant']
+export type BatchSummary = Schemas['BatchSummary']
+export type BatchDetail = Schemas['BatchDetail']
+export type BatchStatus = Schemas['BatchStatus']
+export type TaskView = Schemas['TaskView']
+export type TaskAction = Schemas['TaskAction']
+export type StepAction = Schemas['StepAction']
+export type Problem = Schemas['Problem']
+export type ErrorBody = Schemas['ErrorBody']
+
+export const api = createClient<paths>({ baseUrl: '/api/v1' })
+
+/** A non-2xx response, with the server's error body when it sent one. */
+export class ApiError extends Error {
+  readonly status: number
+  readonly body: ErrorBody | undefined
+
+  constructor(status: number, body: ErrorBody | undefined) {
+    super(body?.message ?? body?.error ?? `request failed with status ${status}`)
+    this.status = status
+    this.body = body
+  }
+
+  get problems(): Problem[] {
+    return this.body?.problems ?? []
+  }
 }
 
-/** Returns null when nobody is signed in. */
-export async function getMe(): Promise<Me | null> {
-  const response = await fetch('/api/me')
-  if (response.status === 401) {
-    return null
-  }
+type Result<T> = { data?: T; error?: unknown; response: Response }
+
+/** Returns the response data, or throws an ApiError. */
+export async function unwrap<T>(request: Promise<Result<T>>): Promise<T> {
+  const { data, error, response } = await request
   if (!response.ok) {
-    throw new Error(`loading the current user failed with status ${response.status}`)
+    throw new ApiError(response.status, error as ErrorBody | undefined)
   }
-  return response.json()
+  return data as T
 }
 
 export const meQuery = queryOptions({
   queryKey: ['me'],
-  queryFn: getMe,
+  queryFn: async (): Promise<Me | null> => {
+    const { data, response } = await api.GET('/me')
+    if (response.status === 401) {
+      return null
+    }
+    if (!response.ok || !data) {
+      throw new ApiError(response.status, undefined)
+    }
+    return data
+  },
   staleTime: 5 * 60 * 1000,
 })
+
+export const plantsQuery = queryOptions({
+  queryKey: ['plants'],
+  queryFn: () => unwrap(api.GET('/plants')),
+})
+
+export const plantQuery = (slug: string) =>
+  queryOptions({
+    queryKey: ['plants', slug],
+    queryFn: () => unwrap(api.GET('/plants/{slug}', { params: { path: { slug } } })),
+    retry: false,
+  })
+
+export const batchesQuery = (status?: BatchStatus) =>
+  queryOptions({
+    queryKey: ['batches', { status }],
+    queryFn: () => unwrap(api.GET('/batches', { params: { query: { status } } })),
+  })
+
+export const batchQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['batches', id],
+    queryFn: () => unwrap(api.GET('/batches/{id}', { params: { path: { id } } })),
+  })
+
+export const tasksQuery = (dueBefore: Date) =>
+  queryOptions({
+    queryKey: ['tasks', { dueBefore: dueBefore.toISOString() }],
+    queryFn: () =>
+      unwrap(api.GET('/tasks', { params: { query: { due_before: dueBefore.toISOString() } } })),
+    // Keep "due" and "overdue" labels current while the page stays open.
+    refetchInterval: 60 * 1000,
+  })
 
 export async function logout(): Promise<void> {
   const response = await fetch('/auth/logout', { method: 'POST' })

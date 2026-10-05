@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT step_index, started_at, ended_at FROM batch_steps WHERE batch_id = $1 ORDER BY step_index",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "step_index",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "ended_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "78f4022acd5b1b2caa577592b800c55818f872a61423daf25dda750d870a3391"
+}

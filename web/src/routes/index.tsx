@@ -1,61 +1,60 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
-import { loginUrl, meQuery } from '../lib/api'
-
-type AuthError = 'provider' | 'expired' | 'state_mismatch' | 'not_allowed' | 'failed'
-
-const authErrorMessages: Record<AuthError, string> = {
-  provider: 'The login provider cancelled or refused the sign-in.',
-  expired: 'The sign-in took too long. Try again.',
-  state_mismatch: "The sign-in couldn't be verified. Try again.",
-  not_allowed: "Your account isn't allowed to use this app.",
-  failed: 'Sign-in failed. The server log has the details.',
-}
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useMemo } from 'react'
+import { BatchRow } from '../components/BatchRow'
+import { TaskRow } from '../components/TaskRow'
+import { buttonClass, Card, ErrorMessage, SectionTitle } from '../components/ui'
+import { batchesQuery, tasksQuery } from '../lib/api'
+import { endOfToday } from '../lib/time'
 
 export const Route = createFileRoute('/')({
-  validateSearch: (search: Record<string, unknown>): { auth_error?: AuthError } => {
-    const error = search.auth_error
-    return typeof error === 'string' && error in authErrorMessages
-      ? { auth_error: error as AuthError }
-      : {}
-  },
-  component: Home,
+  component: Today,
 })
 
-function Home() {
-  const me = useQuery(meQuery)
-  const { auth_error } = Route.useSearch()
+function Today() {
+  // Computing this on every render would change the query key, so keep it for the life of the page.
+  const dueBefore = useMemo(() => endOfToday(), [])
+  const tasks = useQuery(tasksQuery(dueBefore))
+  const batches = useQuery(batchesQuery('active'))
 
-  if (me.isPending) {
-    return <p className="text-stone-500">Loading...</p>
-  }
-
-  if (me.isError) {
-    return <p className="text-red-700">Can't reach the server: {me.error.message}</p>
-  }
-
-  if (!me.data) {
-    return <SignIn error={auth_error} />
-  }
-
-  return <p>Signed in as {me.data.display_name}. Your batches will show up here.</p>
-}
-
-function SignIn({ error }: { error?: AuthError }) {
   return (
-    <div className="mt-16 flex flex-col items-center gap-4 text-center">
-      <p className="text-stone-600">Track your sprouts and microgreens.</p>
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
-          {authErrorMessages[error]}
-        </p>
-      )}
-      <a
-        href={loginUrl('/')}
-        className="rounded-md bg-green-700 px-4 py-2 font-medium text-white hover:bg-green-800"
-      >
-        Sign in
-      </a>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <SectionTitle>Today</SectionTitle>
+        <ErrorMessage error={tasks.error} />
+        {tasks.isPending ? (
+          <p className="text-stone-500">Loading...</p>
+        ) : tasks.data?.length === 0 ? (
+          <p className="text-stone-500">Nothing left to do today.</p>
+        ) : (
+          <ul className="divide-y divide-stone-100">
+            {tasks.data?.map((task) => (
+              <TaskRow key={task.id} task={task} />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <SectionTitle>Growing</SectionTitle>
+          <Link to="/batches/new" className={buttonClass}>
+            Start a batch
+          </Link>
+        </div>
+        <ErrorMessage error={batches.error} />
+        {batches.isPending ? (
+          <p className="text-stone-500">Loading...</p>
+        ) : batches.data?.length === 0 ? (
+          <p className="text-stone-500">No batches growing. Start one to get reminders.</p>
+        ) : (
+          <ul className="divide-y divide-stone-100">
+            {batches.data?.map((batch) => (
+              <BatchRow key={batch.id} batch={batch} />
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   )
 }

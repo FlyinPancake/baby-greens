@@ -5,15 +5,44 @@
 //! `duration_max`, plus the first of each care chore. Each finished chore schedules the next one,
 //! counted from when it was actually done. Advancing into the final harvest step ends the batch.
 
+use serde::Serialize;
 use time::OffsetDateTime;
+use utoipa::ToSchema;
 
 use super::plant::{CareAction, Plant, StepAction};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Serializes as `{ "kind": "advance", "action": "light" }` or `{ "kind": "care", "action": "rinse" }`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(tag = "kind", content = "action", rename_all = "snake_case")]
 pub enum TaskAction {
     /// Move the batch into the next step, whose action this is.
     Advance(StepAction),
     Care(CareAction),
+}
+
+impl TaskAction {
+    pub fn kind(self) -> &'static str {
+        match self {
+            Self::Advance(_) => "advance",
+            Self::Care(_) => "care",
+        }
+    }
+
+    pub fn action(self) -> &'static str {
+        match self {
+            Self::Advance(action) => action.as_str(),
+            Self::Care(action) => action.as_str(),
+        }
+    }
+
+    /// The inverse of [`kind`](Self::kind) and [`action`](Self::action).
+    pub fn from_parts(kind: &str, action: &str) -> Option<Self> {
+        match kind {
+            "advance" => StepAction::parse(action).map(Self::Advance),
+            "care" => CareAction::parse(action).map(Self::Care),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,24 +109,28 @@ pub fn next_care(
     })
 }
 
-/// When each step should start if every earlier step takes its shortest or longest time.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// When a step should start if every step before it takes its shortest or longest time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct StepWindow {
     pub step_index: usize,
     pub action: StepAction,
+    #[serde(with = "time::serde::rfc3339")]
     pub earliest_start: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     pub latest_start: OffsetDateTime,
 }
 
-/// The planned windows for a whole batch. The last entry is the harvest window.
-pub fn timeline(plant: &Plant, started_at: OffsetDateTime) -> Vec<StepWindow> {
-    let mut earliest = started_at;
-    let mut latest = started_at;
+/// The planned windows from `step_index`, which the batch entered at `entered_at`, to the end.
+/// The last entry is the harvest window.
+pub fn timeline(plant: &Plant, step_index: usize, entered_at: OffsetDateTime) -> Vec<StepWindow> {
+    let mut earliest = entered_at;
+    let mut latest = entered_at;
 
     plant
         .steps
         .iter()
         .enumerate()
+        .skip(step_index)
         .map(|(step_index, step)| {
             let window = StepWindow {
                 step_index,
@@ -206,8 +239,38 @@ mod tests {
     }
 
     #[test]
+    fn task_actions_round_trip_through_their_parts() {
+        for action in [
+            TaskAction::Advance(StepAction::Light),
+            TaskAction::Care(CareAction::Rinse),
+        ] {
+            assert_eq!(
+                TaskAction::from_parts(action.kind(), action.action()),
+                Some(action)
+            );
+        }
+        assert_eq!(TaskAction::from_parts("care", "light"), None);
+        assert_eq!(
+            serde_json::to_value(TaskAction::Advance(StepAction::Light)).unwrap(),
+            serde_json::json!({ "kind": "advance", "action": "light" })
+        );
+    }
+
+    #[test]
+    fn timeline_from_a_later_step() {
+        let entered_light = datetime!(2026-10-10 12:00 UTC);
+        let timeline = timeline(&pea_shoots(), 2, entered_light);
+
+        assert_eq!(timeline.len(), 2);
+        assert_eq!(timeline[0].action, StepAction::Light);
+        assert_eq!(timeline[0].earliest_start, entered_light);
+        assert_eq!(timeline[1].earliest_start, datetime!(2026-10-16 12:00 UTC));
+        assert_eq!(timeline[1].latest_start, datetime!(2026-10-20 12:00 UTC));
+    }
+
+    #[test]
     fn timeline_gives_the_harvest_window() {
-        let timeline = timeline(&pea_shoots(), START);
+        let timeline = timeline(&pea_shoots(), 0, START);
         let starts: Vec<_> = timeline
             .iter()
             .map(|window| (window.action, window.earliest_start, window.latest_start))

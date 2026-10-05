@@ -1,0 +1,99 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT b.id, b.plant_slug, b.plant AS \"plant: Json<Plant>\", b.container, b.seed_g,\n               b.started_at, b.status AS \"status: BatchStatus\", b.current_step, b.notes,\n               s.started_at AS step_started_at\n        FROM batches b\n        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step\n        WHERE b.user_id = $1 AND ($2::batch_status IS NULL OR b.status = $2)\n        ORDER BY b.started_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "plant_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "plant: Json<Plant>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "container",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "seed_g",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "status: BatchStatus",
+        "type_info": {
+          "Custom": {
+            "name": "batch_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "harvested",
+                "discarded"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "current_step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "step_started_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "batch_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "harvested",
+                "discarded"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3a9ee840e6ea88a9ef956597cdd9e6bfa7c82de3d639243ea285df608cdfca64"
+}

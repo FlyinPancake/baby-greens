@@ -22,10 +22,11 @@
 use std::{collections::HashSet, fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::span::Span;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Plant {
     pub name: String,
@@ -38,22 +39,24 @@ pub struct Plant {
     pub steps: Vec<Step>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PlantKind {
     Sprout,
     Microgreen,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
     pub action: StepAction,
     /// When the step can end at the earliest. Required for every step except harvest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>, example = "8h")]
     pub duration_min: Option<Span>,
     /// When the step is overdue. Leave it out for a step with a fixed length.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>, example = "12h")]
     pub duration_max: Option<Span>,
     /// Chores that repeat while the batch is in this step.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -62,7 +65,7 @@ pub struct Step {
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum StepAction {
     Soak,
@@ -73,6 +76,17 @@ pub enum StepAction {
 }
 
 impl StepAction {
+    pub fn parse(text: &str) -> Option<Self> {
+        Some(match text {
+            "soak" => Self::Soak,
+            "sprout" => Self::Sprout,
+            "blackout" => Self::Blackout,
+            "light" => Self::Light,
+            "harvest" => Self::Harvest,
+            _ => return None,
+        })
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Soak => "soak",
@@ -84,14 +98,15 @@ impl StepAction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Care {
     pub action: CareAction,
+    #[schema(value_type = String, example = "12h")]
     pub every: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CareAction {
     Rinse,
@@ -100,6 +115,15 @@ pub enum CareAction {
 }
 
 impl CareAction {
+    pub fn parse(text: &str) -> Option<Self> {
+        Some(match text {
+            "rinse" => Self::Rinse,
+            "water" => Self::Water,
+            "mist" => Self::Mist,
+            _ => return None,
+        })
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Rinse => "rinse",
@@ -110,7 +134,7 @@ impl CareAction {
 }
 
 /// One thing wrong with a plant definition. `path` points at the field, like `steps[1].care[0]`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema, thiserror::Error)]
 #[error("{path}: {message}")]
 pub struct Problem {
     pub path: String,
@@ -231,8 +255,9 @@ impl Plant {
 
 /// A plant's id, like `mung-bean`. Lowercase letters, digits, and single hyphens, at most 64
 /// characters.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(try_from = "String", into = "String")]
+#[schema(value_type = String, pattern = "^[a-z0-9]+(-[a-z0-9]+)*$", max_length = 64, example = "mung-bean")]
 pub struct Slug(String);
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -412,6 +437,25 @@ mod tests {
         let plant = Plant::from_json(MUNG_BEAN).unwrap();
         let json = serde_json::to_string(&plant).unwrap();
         assert_eq!(Plant::from_json(&json).unwrap(), plant);
+    }
+
+    #[test]
+    fn action_names_round_trip() {
+        for action in [
+            StepAction::Soak,
+            StepAction::Sprout,
+            StepAction::Blackout,
+            StepAction::Light,
+            StepAction::Harvest,
+        ] {
+            assert_eq!(StepAction::parse(action.as_str()), Some(action));
+            assert_eq!(serde_json::to_value(action).unwrap(), action.as_str());
+        }
+        for action in [CareAction::Rinse, CareAction::Water, CareAction::Mist] {
+            assert_eq!(CareAction::parse(action.as_str()), Some(action));
+            assert_eq!(serde_json::to_value(action).unwrap(), action.as_str());
+        }
+        assert_eq!(StepAction::parse("rinse"), None);
     }
 
     #[test]

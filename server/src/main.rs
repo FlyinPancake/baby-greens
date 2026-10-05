@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use baby_greens_server::{AppState, app, auth::AuthState, config::Config, domain::library};
+use baby_greens_server::{AppState, api, app, auth::AuthState, config::Config, domain::library};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_sessions::ExpiredDeletion;
@@ -10,6 +10,12 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // `baby-greens-server openapi` prints the API spec and exits, without a database or config.
+    if std::env::args().nth(1).as_deref() == Some("openapi") {
+        println!("{}", api::openapi().to_pretty_json()?);
+        return Ok(());
+    }
+
     dotenvy::dotenv().ok();
 
     tracing_subscriber::fmt()

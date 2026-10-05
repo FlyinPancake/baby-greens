@@ -42,7 +42,7 @@ Home growing only. No selling, orders, or customer features.
 | Database | Postgres through SQLx, with compile-time checked queries |
 | Login | OIDC authorization code flow with PKCE (`openidconnect` crate) |
 | Sessions | `tower-sessions` with the SQLx Postgres store |
-| API spec | `utoipa`, served at `/api/openapi.json` |
+| API spec | `utoipa` with `utoipa-axum`, served at `/api/v1/openapi.json`, docs at `/api/v1/docs` |
 | Push | `web-push` crate with VAPID keys |
 | Scheduler | a tokio task that runs once a minute |
 | Static files | the server serves the built frontend, so it ships as one binary |
@@ -56,7 +56,7 @@ Home growing only. No selling, orders, or customer features.
 | Server state | TanStack Query, with the cache saved to IndexedDB and mutations queued while offline |
 | PWA | `vite-plugin-pwa` (Workbox) |
 | UI | Tailwind and shadcn/ui, phone layout first |
-| API client | generated from the OpenAPI spec (`openapi-typescript` or `orval`) |
+| API client | `openapi-fetch` with types from `openapi-typescript` |
 
 ### Rejected alternatives
 
@@ -69,6 +69,31 @@ Home growing only. No selling, orders, or customer features.
   own sync service. Offline writes here are simple and safe to replay, so a mutation queue is
   enough.
 - Tauri. An installed PWA already gives a desktop window.
+
+## API
+
+The JSON API lives under `/api/v1`, so a future native app can stay on `v1` while the API changes.
+`/api/health` and the `/auth/*` browser redirects aren't versioned.
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| GET | `/me` | The signed-in user |
+| GET | `/plants` | The library, with each plant's source: `builtin`, `custom`, or `override` |
+| GET, PUT, DELETE | `/plants/{slug}` | Read, save, or delete a custom plant. PUT validates first |
+| GET, POST | `/batches` | List batches (optionally by status), or start one |
+| GET | `/batches/{id}` | A batch with its step history, upcoming windows, and open tasks |
+| POST | `/batches/{id}/discard` | Stop an active batch |
+| GET | `/tasks?due_before=` | Open tasks on active batches, soonest first |
+| POST | `/tasks/{id}/complete` | Finish a care chore, or advance the batch for an advance task |
+
+Errors share one body: `{ "error": "<code>", "message"?: "...", "problems"?: [...] }`. Validation
+failures are 422 with `problems`, unreadable bodies are 400, and state conflicts such as finishing a
+done task are 409 with a code like `task_done`.
+
+Every handler goes through `utoipa_axum::routes!`, so a route can't exist without being in the spec.
+`baby-greens-server openapi` prints the spec without a database. `mise run api:gen` writes it to
+`server/openapi.json` and regenerates `web/src/lib/api.gen.ts`, and `mise run check` fails when
+either is out of date.
 
 ## Authentication
 
@@ -243,7 +268,8 @@ server only depends on standard OIDC, so the dev setup doesn't need to match pro
    React app shows a login button and the signed-in user.
 3. The plant definition format, a built-in library of 15 plants, custom plant storage, and domain
    scheduling logic with tests.
-4. Batch and task API with utoipa, the generated TypeScript client, and the today view.
+4. Plant, batch, and task API with utoipa-axum under `/api/v1`, the generated TypeScript client, the
+   today view, batch pages, and a JSON editor for plants.
 5. PWA install, push subscription, the scheduler, snoozing, and quiet hours.
 6. Offline support (saved Query cache, queued mutations, replay after re-login) and the harvest log
    with yield stats.

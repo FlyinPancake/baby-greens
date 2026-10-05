@@ -38,6 +38,9 @@ the API when anything in `server/src`, `server/migrations`, the Cargo files, or 
 To run one half on its own, use `mise run dev:server` (restarting) or `mise run server` (single
 run), and `mise run web`.
 
+The API docs are at <http://localhost:5173/api/v1/docs>. After changing an API handler or type, run
+`mise run api:gen` to update `server/openapi.json` and the frontend's generated types.
+
 `mise run serve` builds the frontend and serves it from the Rust server, the way production runs.
 
 Run `mise tasks` to list the other tasks, such as `check`, `test`, `migrate:add`, and `db:reset`.

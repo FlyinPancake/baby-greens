@@ -7,6 +7,7 @@ use std::{
 };
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use super::plant::{Plant, Slug};
 
@@ -35,7 +36,7 @@ fn parse_library(json: &str) -> Result<BTreeMap<Slug, Plant>, String> {
     Ok(plants)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Source {
     Builtin,
@@ -44,7 +45,7 @@ pub enum Source {
     Override,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct LibraryEntry {
     pub slug: Slug,
     pub source: Source,

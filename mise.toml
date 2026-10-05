@@ -74,6 +74,28 @@ description = "Write query metadata to server/.sqlx so builds work without a dat
 dir = "server"
 run = "cargo sqlx prepare"
 
+[tasks."api:gen"]
+description = "Write the OpenAPI spec to server/openapi.json and regenerate the TypeScript types"
+run = [
+  "cargo run -q --manifest-path server/Cargo.toml -- openapi > server/openapi.json",
+  "cd web && bunx openapi-typescript ../server/openapi.json -o src/lib/api.gen.ts",
+]
+
+[tasks."check:api"]
+description = "Fail if server/openapi.json or the generated TypeScript types are out of date"
+run = """
+set -eu
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cargo run -q --manifest-path server/Cargo.toml -- openapi > "$tmp/openapi.json"
+(cd web && bunx openapi-typescript "$tmp/openapi.json" -o "$tmp/api.gen.ts" > /dev/null)
+if ! diff -q server/openapi.json "$tmp/openapi.json" > /dev/null \
+  || ! diff -q web/src/lib/api.gen.ts "$tmp/api.gen.ts" > /dev/null; then
+  echo "The API types are out of date. Run: mise run api:gen" >&2
+  exit 1
+fi
+"""
+
 [tasks."check:fmt"]
 description = "Check Rust formatting"
 run = "cargo fmt --manifest-path server/Cargo.toml --check"
@@ -89,7 +111,7 @@ run = ["bun run typecheck", "bun run lint"]
 
 [tasks.check]
 description = "Run all formatting, lint, and type checks"
-depends = ["check:fmt", "check:clippy", "check:web"]
+depends = ["check:fmt", "check:clippy", "check:web", "check:api"]
 
 [tasks.test]
 description = "Run all tests"
