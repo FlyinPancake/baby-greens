@@ -1,11 +1,12 @@
 use axum::{Json, Router, extract::State, http::StatusCode, routing::get};
 use serde::Serialize;
 
-use crate::AppState;
+use crate::{AppState, auth::AuthUser, db::users::User};
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/health", get(health))
+        .route("/me", get(me))
         .fallback(|| async { StatusCode::NOT_FOUND })
 }
 
@@ -25,4 +26,8 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<Health>) {
             )
         }
     }
+}
+
+async fn me(AuthUser(user): AuthUser) -> Json<User> {
+    Json(user)
 }

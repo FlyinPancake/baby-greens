@@ -43,9 +43,15 @@ Run `mise tasks` to list the other tasks, such as `check`, `test`, `migrate:add`
 ## Dev login
 
 Dex has two test users, `grower@example.com` and `second@example.com`. Both use the password
-`password`. Login is part of milestone 2.
+`password`. The server runs OIDC discovery against `OIDC_ISSUER_URL` at startup, so start Dex with
+`mise run up` before the server.
+
+To use another provider, register a confidential client with the redirect URI
+`<PUBLIC_URL>/auth/callback` and set the `OIDC_*` variables in `.env`.
 
 ## Versions
 
 - sqlx stays on 0.8 because `tower-sessions-sqlx-store` 0.15 requires it. Upgrade both together.
 - The schema uses `uuidv7()`, which needs Postgres 18 or newer.
+- Queries use the `sqlx::query!` macros. After changing a query, run `mise run sqlx:prepare` and
+  commit `server/.sqlx`, so builds without a database (CI, Docker) keep working.

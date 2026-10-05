@@ -80,16 +80,20 @@ discovery.
 
 The server is a confidential OIDC client. The browser never sees an OIDC token.
 
-1. `GET /auth/login` stores a PKCE verifier, state, and nonce in the session and redirects to the
-   provider.
+1. `GET /auth/login?return_to=/path` stores a PKCE verifier, state, nonce, and return path in the
+   session and redirects to the provider. A login that isn't finished expires after 10 minutes.
 2. `GET /auth/callback` checks the state, exchanges the code, and verifies the ID token signature,
    issuer, audience, and nonce.
 3. The server creates or updates the user, keyed by `(issuer, subject)`. Email is display data only,
    because a user can change it at the provider.
-4. The server starts a session and sets an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Sessions
-   last 30 days and renew on use.
-5. `POST /auth/logout` deletes the session. If the provider supports RP-initiated logout, the server
-   redirects there too.
+4. The server rotates the session id, stores the user id, and sets an `HttpOnly`, `SameSite=Lax`
+   cookie, plus `Secure` when `PUBLIC_URL` is https. Sessions last 30 days and renew on use. They
+   live in the `tower_sessions` schema, which the session store creates itself.
+5. The callback redirects to the stored return path. On failure it redirects to
+   `/?auth_error=<code>` with one of `provider`, `expired`, `state_mismatch`, `not_allowed`, or
+   `failed`.
+6. `POST /auth/logout` deletes the session and returns 204. RP-initiated logout at the provider is
+   not built yet, because Dex doesn't support it. Add it when it matters for the real provider.
 
 For CSRF protection, the server rejects any request other than GET whose `Origin` header doesn't
 match the app's origin.
