@@ -12,14 +12,15 @@ Home growing only. No selling, orders, or customer features.
 
 ### MVP
 
-1. Seed library. Each variety has default timings (soak hours, rinses per day, blackout days,
-   harvest window, seed grams per tray). Users can edit defaults and add varieties.
-2. Batches. Pick a variety, seed weight, container, and start time. The server computes stage dates
-   and generates tasks.
+1. Plant library. Each plant is a JSON definition listing its steps (soak, sprout, blackout, light,
+   harvest), with a duration range and repeating care chores for each step. See "Plant definitions"
+   below. Built-in plants ship in the binary. Users can add custom plants or override built-in ones.
+2. Batches. Pick a plant, seed weight, container, and start time. The user advances the batch from
+   step to step, and the server generates reminders and chores for the current step.
 3. Today view. Due tasks across all batches, ticked off one at a time.
 4. Reminders. Web push when a task is due, with snoozing and quiet hours.
 5. Harvest log. Date, yield in grams, a 1 to 5 rating, and notes. Yield ratio (grams harvested per
-   gram of seed) per variety.
+   gram of seed) per plant.
 
 ### Later
 
@@ -127,19 +128,70 @@ Session        (managed by tower-sessions)
 ApiToken       (id, user, name, token_hash, last_used_at?, created_at)   -- later
 PushSubscription (id, user, endpoint, p256dh, auth, user_agent, created_at)
 
-Variety        (id, user?, name, kind: sprout|microgreen, soak_hours,
-                rinses_per_day, blackout_days, harvest_day_min, harvest_day_max,
-                seed_g_per_tray)
-Batch          (id, user, variety, container, seed_g, started_at, status, notes)
-Stage          (id, batch, kind: soak|blackout|light|growing, starts_at, ends_at)
-Task           (id, batch, kind: rinse|water|move|harvest, due_at, snoozed_until?,
-                done_at?, notified_at?)
+CustomPlant    (slug PK, definition jsonb, created_by?, created_at, updated_at)
+Batch          (id, user, plant_slug, plant jsonb, current_step, container, seed_g,
+                started_at, status, notes)
+BatchStep      (batch, step_index, started_at, ended_at?)
+Task           (id, batch, step_index, kind: advance|care, action, due_at, overdue_at?,
+                snoozed_until?, done_at?, notified_at?)
 Harvest        (id, batch, harvested_at, yield_g, rating, notes)
 ```
 
-`Variety.user` is null for built-in varieties. All times are `timestamptz`. The server uses
-`User.timezone` for quiet hours and for showing "today". The `kind` and `status` columns are
-Postgres enums mapped to Rust enums with `sqlx::Type`.
+Custom plants are shared by every account on the server. A batch stores a copy of its plant's
+definition from when it started, so editing a plant only affects new batches. `BatchStep` records
+how long each step actually took. All times are `timestamptz`. The server uses `User.timezone` for
+quiet hours and for showing "today". The `kind` and `status` columns are Postgres enums mapped to
+Rust enums with `sqlx::Type`.
+
+## Plant definitions
+
+```json
+{
+  "name": "Mung bean sprouts",
+  "name_lat": "Vigna radiata",
+  "kind": "sprout",
+  "seed_g": 60,
+  "steps": [
+    { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+    {
+      "action": "sprout",
+      "duration_min": "2d",
+      "duration_max": "5d",
+      "care": [{ "action": "rinse", "every": "12h" }],
+      "note": "Keep them dark and weighed down for thicker, straighter sprouts."
+    },
+    { "action": "harvest" }
+  ]
+}
+```
+
+- `kind` is `sprout` or `microgreen`. `name_lat`, `seed_g` (grams for one jar or tray), and a step's
+  `note` are optional.
+- Step actions are `soak`, `sprout`, `blackout`, `light`, and `harvest`. Care actions are `rinse`,
+  `water`, and `mist`.
+- Durations are a whole number and a unit: `30m`, `12h`, or `4d`.
+- Every step except the last needs `duration_min`. `duration_max` is optional and can't be shorter.
+  The last step must be `harvest`, with no durations or care. Each care action can appear once per
+  step.
+- Unknown fields are errors, so a typo doesn't get silently ignored. Validation reports every
+  problem with a path, like `steps[1].duration_max: must not be shorter than duration_min`.
+
+Built-in plants live in `server/plants/builtin.json`, keyed by slug, and get compiled in with
+`include_str!`. A test checks that every entry is valid, and the server parses them at startup.
+Slugs are lowercase letters, digits, and single hyphens. A custom plant with a built-in slug
+overrides it, and deleting the custom plant restores the built-in one.
+
+### Scheduling
+
+The user advances a batch by hand. When the batch enters a step, the server creates:
+
+- an advance task, due at `duration_min` and overdue at `duration_max`. Its action is the next
+  step's action, like "move to light" or "harvest".
+- the first task for each care chore, due one interval after the step starts.
+
+Finishing a chore schedules the next one, one interval after it was actually done. Advancing closes
+the step's open tasks and records the step's end time. Advancing into `harvest` ends the batch. The
+planned harvest window is the sum of the earlier steps' minimum and maximum durations.
 
 ## Server layout
 
@@ -147,19 +199,22 @@ Postgres enums mapped to Rust enums with `sqlx::Type`.
 server/
   migrations/
   src/
-    main.rs        config, router, startup
+    main.rs        startup and shutdown
+    lib.rs         AppState and the router
     api/           handlers and utoipa annotations
     auth/          OIDC flow, sessions, AuthUser extractor
-    domain/        scheduling logic, no HTTP or SQL
+    domain/        plant format, library, and scheduling, no HTTP or SQL
     db/            SQLx queries
     jobs/          the per-minute scheduler
     notify/        Notifier trait and the web push implementation
+  plants/
+    builtin.json   the built-in plant library
 ```
 
-`domain/` turns a variety and a start time into stages and tasks. It has no I/O, so unit tests cover
-it fully. It's where bugs are most likely.
+`domain/` turns a plant and a step start time into tasks. It has no I/O, so unit tests cover it
+fully. It's where bugs are most likely.
 
-Domain code emits events such as "task became due" and "stage changed". `notify/` listens to these
+Domain code emits events such as "task became due" and "step changed". `notify/` listens to these
 through a `Notifier` trait. Web push is the first implementation. APNs or FCM for a native app, and
 MQTT for HA, become further implementations without changes to the scheduling code.
 
@@ -184,7 +239,8 @@ server only depends on standard OIDC, so the dev setup doesn't need to match pro
    config loading.
 2. OIDC login, sessions, the `AuthUser` extractor, the Origin check, and a `/api/me` endpoint. The
    React app shows a login button and the signed-in user.
-3. Domain scheduling logic with tests, and a seed library of about 15 varieties.
+3. The plant definition format, a built-in library of 15 plants, custom plant storage, and domain
+   scheduling logic with tests.
 4. Batch and task API with utoipa, the generated TypeScript client, and the today view.
 5. PWA install, push subscription, the scheduler, snoozing, and quiet hours.
 6. Offline support (saved Query cache, queued mutations, replay after re-login) and the harvest log

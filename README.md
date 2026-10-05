@@ -7,6 +7,8 @@ and milestones.
 
 - `server/` is the Axum API. It uses SQLx with Postgres and applies migrations from
   `server/migrations/` on startup.
+- `server/plants/builtin.json` is the built-in plant library. The plan's "Plant definitions" section
+  describes the format.
 - `web/` is the React PWA, built with Vite, TanStack Router, TanStack Query, and Tailwind.
 - `compose.yaml` runs Postgres 18 and Dex for development.
 - `dev/dex.yaml` configures Dex as a stand-in OIDC provider.

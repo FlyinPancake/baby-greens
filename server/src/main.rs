@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use baby_greens_server::{AppState, app, auth::AuthState, config::Config};
+use baby_greens_server::{AppState, app, auth::AuthState, config::Config, domain::library};
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tower_sessions::ExpiredDeletion;
@@ -42,6 +42,12 @@ async fn main() -> Result<()> {
         session_store
             .clone()
             .continuously_delete_expired(Duration::from_secs(60 * 60)),
+    );
+
+    // Parse the built-in plant library now, so a bad entry stops startup instead of a request.
+    tracing::info!(
+        plants = library::builtin().len(),
+        "loaded the built-in plant library"
     );
 
     let auth = AuthState::new(&config.oidc, &config.public_url).await?;

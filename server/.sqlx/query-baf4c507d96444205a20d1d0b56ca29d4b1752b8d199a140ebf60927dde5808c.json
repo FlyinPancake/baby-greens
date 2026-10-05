@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT definition AS \"definition: Json<Plant>\" FROM custom_plants WHERE slug = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "definition: Json<Plant>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "baf4c507d96444205a20d1d0b56ca29d4b1752b8d199a140ebf60927dde5808c"
+}

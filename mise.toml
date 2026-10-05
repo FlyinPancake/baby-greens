@@ -32,6 +32,7 @@ run = """
 mise watch server --restart \
   --watch server/src \
   --watch server/migrations \
+  --watch server/plants \
   --watch server/Cargo.toml \
   --watch server/Cargo.lock \
   --watch .env

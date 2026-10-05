@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO custom_plants (slug, definition, created_by)\n        VALUES ($1, $2, $3)\n        ON CONFLICT (slug) DO UPDATE\n            SET definition = EXCLUDED.definition,\n                updated_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "861748a773d7a2f04e5c5691bc3c99a4b8ea0c13d8aa60550461c7eaabf32aa9"
+}

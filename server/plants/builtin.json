@@ -1,0 +1,290 @@
+{
+  "alfalfa": {
+    "name": "Alfalfa sprouts",
+    "name_lat": "Medicago sativa",
+    "kind": "sprout",
+    "seed_g": 15,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "4d",
+        "duration_max": "6d",
+        "care": [{ "action": "rinse", "every": "12h" }],
+        "note": "Give them indirect light on the last day to green the leaves."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "broccoli-sprouts": {
+    "name": "Broccoli sprouts",
+    "name_lat": "Brassica oleracea var. italica",
+    "kind": "sprout",
+    "seed_g": 15,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "3d",
+        "duration_max": "5d",
+        "care": [{ "action": "rinse", "every": "12h" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "chickpea": {
+    "name": "Chickpea sprouts",
+    "name_lat": "Cicer arietinum",
+    "kind": "sprout",
+    "seed_g": 100,
+    "steps": [
+      { "action": "soak", "duration_min": "12h", "duration_max": "18h" },
+      {
+        "action": "sprout",
+        "duration_min": "1d",
+        "duration_max": "3d",
+        "care": [{ "action": "rinse", "every": "8h" }],
+        "note": "Harvest when the tails are about as long as the bean."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "fenugreek": {
+    "name": "Fenugreek sprouts",
+    "name_lat": "Trigonella foenum-graecum",
+    "kind": "sprout",
+    "seed_g": 30,
+    "steps": [
+      { "action": "soak", "duration_min": "6h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "3d",
+        "duration_max": "5d",
+        "care": [{ "action": "rinse", "every": "12h" }],
+        "note": "They turn bitter if left to grow too long."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "lentil": {
+    "name": "Lentil sprouts",
+    "name_lat": "Lens culinaris",
+    "kind": "sprout",
+    "seed_g": 60,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "2d",
+        "duration_max": "3d",
+        "care": [{ "action": "rinse", "every": "12h" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "mung-bean": {
+    "name": "Mung bean sprouts",
+    "name_lat": "Vigna radiata",
+    "kind": "sprout",
+    "seed_g": 60,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "2d",
+        "duration_max": "5d",
+        "care": [{ "action": "rinse", "every": "12h" }],
+        "note": "Keep them dark and weighed down for thicker, straighter sprouts."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "radish-sprouts": {
+    "name": "Radish sprouts",
+    "name_lat": "Raphanus sativus",
+    "kind": "sprout",
+    "seed_g": 15,
+    "steps": [
+      { "action": "soak", "duration_min": "6h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "3d",
+        "duration_max": "5d",
+        "care": [{ "action": "rinse", "every": "12h" }],
+        "note": "The fuzz on the roots is root hair, not mold. It disappears when rinsed."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "red-clover": {
+    "name": "Red clover sprouts",
+    "name_lat": "Trifolium pratense",
+    "kind": "sprout",
+    "seed_g": 15,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "sprout",
+        "duration_min": "4d",
+        "duration_max": "6d",
+        "care": [{ "action": "rinse", "every": "12h" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "arugula": {
+    "name": "Arugula microgreens",
+    "name_lat": "Eruca vesicaria subsp. sativa",
+    "kind": "microgreen",
+    "seed_g": 15,
+    "steps": [
+      {
+        "action": "blackout",
+        "duration_min": "2d",
+        "duration_max": "4d",
+        "care": [{ "action": "mist", "every": "12h" }]
+      },
+      {
+        "action": "light",
+        "duration_min": "5d",
+        "duration_max": "8d",
+        "care": [{ "action": "water", "every": "1d" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "basil": {
+    "name": "Basil microgreens",
+    "name_lat": "Ocimum basilicum",
+    "kind": "microgreen",
+    "seed_g": 15,
+    "steps": [
+      {
+        "action": "blackout",
+        "duration_min": "4d",
+        "duration_max": "5d",
+        "care": [{ "action": "mist", "every": "12h" }],
+        "note": "Don't soak. The seeds form a gel coat when wet."
+      },
+      {
+        "action": "light",
+        "duration_min": "10d",
+        "duration_max": "16d",
+        "care": [{ "action": "water", "every": "1d" }],
+        "note": "Water from below once the seedlings stand up."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "broccoli-microgreens": {
+    "name": "Broccoli microgreens",
+    "name_lat": "Brassica oleracea var. italica",
+    "kind": "microgreen",
+    "seed_g": 25,
+    "steps": [
+      {
+        "action": "blackout",
+        "duration_min": "3d",
+        "duration_max": "4d",
+        "care": [{ "action": "mist", "every": "12h" }]
+      },
+      {
+        "action": "light",
+        "duration_min": "5d",
+        "duration_max": "8d",
+        "care": [{ "action": "water", "every": "1d" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "kale": {
+    "name": "Kale microgreens",
+    "name_lat": "Brassica oleracea var. sabellica",
+    "kind": "microgreen",
+    "seed_g": 25,
+    "steps": [
+      {
+        "action": "blackout",
+        "duration_min": "3d",
+        "duration_max": "4d",
+        "care": [{ "action": "mist", "every": "12h" }]
+      },
+      {
+        "action": "light",
+        "duration_min": "5d",
+        "duration_max": "8d",
+        "care": [{ "action": "water", "every": "1d" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "pea-shoots": {
+    "name": "Pea shoots",
+    "name_lat": "Pisum sativum",
+    "kind": "microgreen",
+    "seed_g": 250,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "blackout",
+        "duration_min": "3d",
+        "duration_max": "4d",
+        "care": [{ "action": "mist", "every": "12h" }],
+        "note": "Weigh the seeds down with a second tray."
+      },
+      {
+        "action": "light",
+        "duration_min": "6d",
+        "duration_max": "10d",
+        "care": [{ "action": "water", "every": "1d" }],
+        "note": "Cut above the lowest leaf and they may regrow for a second harvest."
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "radish-microgreens": {
+    "name": "Radish microgreens",
+    "name_lat": "Raphanus sativus",
+    "kind": "microgreen",
+    "seed_g": 35,
+    "steps": [
+      {
+        "action": "blackout",
+        "duration_min": "2d",
+        "duration_max": "3d",
+        "care": [{ "action": "mist", "every": "12h" }]
+      },
+      {
+        "action": "light",
+        "duration_min": "4d",
+        "duration_max": "7d",
+        "care": [{ "action": "water", "every": "1d" }]
+      },
+      { "action": "harvest" }
+    ]
+  },
+  "sunflower": {
+    "name": "Sunflower microgreens",
+    "name_lat": "Helianthus annuus",
+    "kind": "microgreen",
+    "seed_g": 200,
+    "steps": [
+      { "action": "soak", "duration_min": "8h", "duration_max": "12h" },
+      {
+        "action": "blackout",
+        "duration_min": "3d",
+        "duration_max": "4d",
+        "care": [{ "action": "mist", "every": "12h" }],
+        "note": "Weigh the seeds down with a second tray."
+      },
+      {
+        "action": "light",
+        "duration_min": "5d",
+        "duration_max": "8d",
+        "care": [{ "action": "water", "every": "1d" }],
+        "note": "Brush off the seed hulls before harvest."
+      },
+      { "action": "harvest" }
+    ]
+  }
+}
