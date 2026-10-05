@@ -7,6 +7,7 @@ import { SyncBanner } from '@/components/SyncBanner'
 import { Highlight } from '@/components/PageHeading'
 import { Button } from '@/components/ui/button'
 import { loginUrl, meQuery } from '@/lib/api'
+import { SproutingJar } from '@/lib/icons'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: RootLayout,
@@ -19,11 +20,11 @@ function RootLayout() {
     <div className="min-h-dvh text-foreground">
       <header className="sticky top-0 z-40 border-b-2 border-border bg-secondary-background">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <Link to="/" aria-label="baby-greens home" className="flex items-center gap-2">
+          <Link to="/" aria-label="baby greens home" className="flex items-center gap-2">
             <span className="grid size-9 -rotate-6 place-items-center rounded-base border-2 border-border bg-main shadow-shadow">
-              <Sprout className="size-5" />
+              <SproutingJar className="size-5" />
             </span>
-            <span className="hidden font-heading text-xl tracking-tight sm:inline">baby-greens</span>
+            <span className="hidden font-heading text-xl tracking-tight sm:inline">baby greens</span>
           </Link>
           {me.data && (
             <div className="flex items-center gap-2">
@@ -107,7 +108,7 @@ function SignIn() {
           Never miss a <Highlight>rinse</Highlight>.
         </h1>
         <p className="max-w-md text-lg">
-          baby-greens tracks every jar and tray, tells you when to rinse, water, or move into
+          baby greens tracks every jar and tray, tells you when to rinse, water, or move into
           light, and says when it's time to harvest.
         </p>
         {error && <ErrorAlert error={new Error(error)} />}

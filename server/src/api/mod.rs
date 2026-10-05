@@ -27,7 +27,7 @@ use crate::{AppState, error::AppError};
 
 #[derive(OpenApi)]
 #[openapi(
-    info(title = "baby-greens", version = "1", description = "Sprout and microgreen tracker"),
+    info(title = "baby greens", version = "1", description = "Sprout and microgreen tracker"),
     servers((url = "/api/v1")),
     modifiers(&SessionCookie),
     tags(

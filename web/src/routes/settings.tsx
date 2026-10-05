@@ -307,7 +307,7 @@ function InstallApp() {
         <p>You're using the installed app.</p>
       ) : installable ? (
         <>
-          <p>Install baby-greens to open it from your home screen or dock, like any other app.</p>
+          <p>Install baby greens to open it from your home screen or dock, like any other app.</p>
           <div>
             <Button onClick={() => void install()}>
               <Download /> Install
@@ -316,7 +316,7 @@ function InstallApp() {
         </>
       ) : (
         <p>
-          Add baby-greens to your home screen from the browser menu. On iPhone and iPad, tap Share,
+          Add baby greens to your home screen from the browser menu. On iPhone and iPad, tap Share,
           then Add to Home Screen.
         </p>
       )}

@@ -33,7 +33,7 @@ type Reminder = { title?: string; body?: string; url?: string; tag?: string }
 self.addEventListener('push', (event) => {
   const reminder: Reminder = event.data?.json() ?? {}
   event.waitUntil(
-    self.registration.showNotification(reminder.title ?? 'baby-greens', {
+    self.registration.showNotification(reminder.title ?? 'baby greens', {
       body: reminder.body,
       tag: reminder.tag,
       icon: '/pwa-192x192.png',

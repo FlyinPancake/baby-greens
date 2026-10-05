@@ -167,7 +167,7 @@ async fn send_test(
         .ok_or(AppError::Conflict("push_disabled"))?;
     let message = PushMessage {
         title: "Reminders are on".into(),
-        body: "This is how baby-greens tells you it's time to rinse, water, or harvest.".into(),
+        body: "This is how baby greens tells you it's time to rinse, water, or harvest.".into(),
         url: "/settings".into(),
         tag: "test".into(),
     };

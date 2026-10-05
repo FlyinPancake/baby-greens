@@ -20,8 +20,8 @@ export default defineConfig({
       filename: 'sw.ts',
       injectRegister: false,
       manifest: {
-        name: 'baby-greens',
-        short_name: 'baby-greens',
+        name: 'baby greens',
+        short_name: 'baby greens',
         description: 'Track your sprouts and microgreens, with reminders.',
         theme_color: '#05e17a',
         background_color: '#dcfce7',
