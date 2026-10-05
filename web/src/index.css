@@ -105,7 +105,7 @@
   body {
     background-color: var(--background);
     /* A dot grid, like graph paper in a grow log. */
-    background-image: radial-gradient(oklch(0% 0 0 / 0.14) 1px, transparent 1px);
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
     background-size: 22px 22px;
   }
 
@@ -129,4 +129,42 @@
 
 @utility animate-pop {
   animation: pop 0.35s ease-out;
+}
+
+:root {
+  --dot: oklch(0% 0 0 / 0.14);
+}
+
+/* Dark mode. neobrutalism.dev has no dark palette for its styles, so this follows the usual
+   neobrutalist dark look: dark surfaces, the same black borders and hard shadows, and the
+   bright accents unchanged. */
+.dark {
+  --background: hsl(150 12% 19%);
+  --secondary-background: hsl(150 10% 12%);
+  --foreground: hsl(60 10% 93%);
+  --main-foreground: oklch(0% 0 0);
+  --border: oklch(0% 0 0);
+  --ring: var(--main);
+  --dot: oklch(100% 0 0 / 0.08);
+  /* Native inputs, selects, and date pickers draw themselves dark too. */
+  color-scheme: dark;
+}
+
+/* Bright surfaces keep black text. Without this, the light dark-mode text would sit on green,
+   amber, and red. */
+.dark
+  :is(
+    .bg-main,
+    .bg-due,
+    .bg-overdue,
+    .hover\:bg-main:hover,
+    .\[\&\.active\]\:bg-main.active
+  ) {
+  color: var(--main-foreground);
+}
+
+/* The components draw black focus rings, which disappear on dark surfaces. */
+.dark *:focus-visible {
+  --tw-ring-color: var(--main);
+  --tw-ring-offset-color: var(--background);
 }

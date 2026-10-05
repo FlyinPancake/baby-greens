@@ -33,3 +33,28 @@ test('the reminders panel settles on a status', async ({ page }) => {
   // Headless Chromium has no push service, so it may end on an error. It must not hang.
   await expect(page.getByText('Checking this device...')).toHaveCount(0, { timeout: 15_000 })
 })
+
+test('dark mode can be chosen and follows the device by default', async ({ browser }) => {
+  // A dark device starts dark without choosing anything.
+  const context = await browser.newContext({
+    colorScheme: 'dark',
+    storageState: 'e2e/.auth/user.json',
+  })
+  const page = await context.newPage()
+  await page.goto('/settings')
+  const html = page.locator('html')
+  await expect(html).toHaveClass(/\bdark\b/)
+
+  // Choosing light wins over the device, and survives a reload.
+  await page.getByRole('radio', { name: 'Light' }).click()
+  await expect(html).not.toHaveClass(/\bdark\b/)
+  await page.reload()
+  await expect(html).not.toHaveClass(/\bdark\b/)
+
+  await page.getByRole('radio', { name: 'Dark' }).click()
+  await expect(html).toHaveClass(/\bdark\b/)
+
+  await page.getByRole('radio', { name: 'Match device' }).click()
+  await expect(html).toHaveClass(/\bdark\b/)
+  await context.close()
+})

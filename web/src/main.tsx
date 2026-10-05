@@ -6,6 +6,7 @@ import '@fontsource-variable/space-grotesk'
 import './index.css'
 import { registerSW } from 'virtual:pwa-register'
 import './lib/install'
+import './lib/theme'
 import { routeTree } from './routeTree.gen'
 
 const queryClient = new QueryClient()

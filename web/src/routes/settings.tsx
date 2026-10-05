@@ -1,6 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Bell, BellOff, Download, LogOut, MoonStar, Send, Smartphone } from 'lucide-react'
+import {
+  Bell,
+  BellOff,
+  Download,
+  LogOut,
+  Monitor,
+  Moon,
+  MoonStar,
+  Palette,
+  Send,
+  Smartphone,
+  Sun,
+} from 'lucide-react'
 import { type FormEvent, type ReactNode, useState, useSyncExternalStore } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { Highlight, PageHeading } from '@/components/PageHeading'
@@ -10,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { api, logout, type Me, meQuery, unwrap } from '@/lib/api'
 import { canInstall, install, onInstallChange } from '@/lib/install'
 import { disablePush, enablePush, type PushState, pushState } from '@/lib/push'
+import { onThemeChange, setThemeChoice, themeChoice } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/settings')({
@@ -26,6 +39,7 @@ function Settings() {
       </PageHeading>
       <Reminders />
       {me.data && <Schedule me={me.data} />}
+      <Appearance />
       <InstallApp />
       {me.data && <Account me={me.data} />}
     </div>
@@ -242,6 +256,30 @@ function Schedule({ me }: { me: Me }) {
           </Button>
         </div>
       </form>
+    </Panel>
+  )
+}
+
+function Appearance() {
+  const choice = useSyncExternalStore(onThemeChange, themeChoice)
+
+  return (
+    <Panel icon={Palette} title="Appearance">
+      <Segmented
+        label="Theme"
+        value={choice}
+        onChange={setThemeChoice}
+        options={[
+          { value: 'system', label: 'Match device', icon: Monitor },
+          { value: 'light', label: 'Light', icon: Sun },
+          { value: 'dark', label: 'Dark', icon: Moon },
+        ]}
+      />
+      <p className="text-sm">
+        {choice === 'system'
+          ? 'Follows the light or dark setting of this device, and switches with it.'
+          : 'Saved on this device only.'}
+      </p>
     </Panel>
   )
 }
