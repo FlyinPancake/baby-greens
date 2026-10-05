@@ -1,0 +1,95 @@
+[tools]
+bun = "1"
+watchexec = "2"
+"cargo:sqlx-cli" = { version = "0.8.6", default-features = false, features = "rustls,postgres" }
+
+# Loads DATABASE_URL and friends for tasks, sqlx-cli, and your shell.
+[env]
+_.file = ".env"
+
+[tasks.up]
+description = "Start Postgres and Dex in the background"
+run = "docker compose up -d --wait"
+
+[tasks.down]
+description = "Stop the dev containers. Data stays in the postgres-data volume."
+run = "docker compose down"
+
+[tasks.install]
+description = "Install frontend dependencies"
+dir = "web"
+run = "bun install"
+
+[tasks.server]
+description = "Run the API server on BIND_ADDR. It applies pending migrations on startup."
+run = "cargo run --manifest-path server/Cargo.toml"
+
+[tasks."dev:server"]
+description = "Run the API server and restart it when its sources change"
+# Watch paths go here rather than in `sources` on the server task. With `sources`, mise skips
+# `mise run server` when nothing changed since the last run, which is wrong for a server.
+run = """
+mise watch server --restart \
+  --watch server/src \
+  --watch server/migrations \
+  --watch server/Cargo.toml \
+  --watch server/Cargo.lock \
+  --watch .env
+"""
+
+[tasks.dev]
+description = "Run the restarting API server and the Vite dev server together"
+depends = ["dev:server", "web"]
+
+[tasks.web]
+description = "Run the Vite dev server on http://localhost:5173"
+dir = "web"
+run = "bun run dev"
+
+[tasks."build:web"]
+description = "Build the frontend into web/dist"
+dir = "web"
+run = "bun run build"
+
+[tasks.serve]
+description = "Build the frontend and serve it from the Rust server, like production"
+depends = ["build:web"]
+env = { WEB_DIST = "web/dist" }
+run = "cargo run --manifest-path server/Cargo.toml"
+
+[tasks."migrate:add"]
+description = "Create a new SQL migration"
+dir = "server"
+usage = 'arg "<name>" help="Migration name, like add_seed_stock"'
+run = 'sqlx migrate add "${usage_name?}"'
+
+[tasks."db:reset"]
+description = "Drop, recreate, and migrate the dev database"
+dir = "server"
+run = "sqlx database reset -y"
+
+[tasks."sqlx:prepare"]
+description = "Write query metadata to server/.sqlx so builds work without a database"
+dir = "server"
+run = "cargo sqlx prepare"
+
+[tasks."check:fmt"]
+description = "Check Rust formatting"
+run = "cargo fmt --manifest-path server/Cargo.toml --check"
+
+[tasks."check:clippy"]
+description = "Run clippy with warnings as errors"
+run = "cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings"
+
+[tasks."check:web"]
+description = "Type check and lint the frontend"
+dir = "web"
+run = ["bun run typecheck", "bun run lint"]
+
+[tasks.check]
+description = "Run all formatting, lint, and type checks"
+depends = ["check:fmt", "check:clippy", "check:web"]
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test --manifest-path server/Cargo.toml"
