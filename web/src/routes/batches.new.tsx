@@ -16,6 +16,7 @@ import { stepIcons } from '@/lib/icons'
 import { stepNames } from '@/lib/labels'
 import { planSteps } from '@/lib/plan'
 import { formatWhen, formatWindow, toLocalInput } from '@/lib/time'
+import { useNow } from '@/lib/useNow'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/batches/new')({
@@ -62,7 +63,7 @@ function NewBatch() {
   const [seed, setSeed] = useState<number | null>(null)
   const [startedAt, setStartedAt] = useState(() => toLocalInput(new Date()))
   const [startLabel, setStartLabel] = useState<string | null>('Now')
-  const [latestStart] = useState(startedAt)
+  const now = useNow()
   const [notes, setNotes] = useState('')
 
   const entry = plants.data?.find((candidate) => candidate.slug === plantSlug)
@@ -180,22 +181,26 @@ function NewBatch() {
 
             <Question label="When did it start?">
               <div className="flex flex-wrap gap-2">
-                {startPresets.map((preset) => (
-                  <Chip
-                    key={preset.label}
-                    selected={startLabel === preset.label}
-                    onClick={() => {
-                      setStartLabel(preset.label)
-                      setStartedAt(toLocalInput(preset.at()))
-                    }}
-                  >
-                    {preset.label}
-                  </Chip>
-                ))}
+                {/* Just after midnight, "this morning" hasn't happened yet. The slack covers
+                    `now` only ticking once a minute, so "Now" stays. */}
+                {startPresets
+                  .filter((preset) => preset.at().getTime() <= now.getTime() + 60_000)
+                  .map((preset) => (
+                    <Chip
+                      key={preset.label}
+                      selected={startLabel === preset.label}
+                      onClick={() => {
+                        setStartLabel(preset.label)
+                        setStartedAt(toLocalInput(preset.at()))
+                      }}
+                    >
+                      {preset.label}
+                    </Chip>
+                  ))}
                 <Input
                   type="datetime-local"
                   value={startedAt}
-                  max={latestStart}
+                  max={toLocalInput(now)}
                   onChange={(event) => {
                     setStartLabel(null)
                     setStartedAt(event.target.value)
