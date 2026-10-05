@@ -1,10 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
-import { TaskRow } from '../components/TaskRow'
-import { Card, ErrorMessage, SectionTitle, secondaryButtonClass } from '../components/ui'
-import { api, type BatchDetail, batchQuery, unwrap } from '../lib/api'
-import { stepLabels, stepNames } from '../lib/labels'
-import { formatWhen, formatWindow } from '../lib/time'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { ArrowLeft, Check, Trash2 } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ErrorAlert } from '@/components/ErrorAlert'
+import { stepIcons } from '@/lib/icons'
+import { TaskCard } from '@/components/TaskCard'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { api, type BatchDetail, batchQuery, unwrap } from '@/lib/api'
+import { stepLabels, stepNames } from '@/lib/labels'
+import { formatRange, formatWhen, formatWindow, percentBetween } from '@/lib/time'
+import { useNow } from '@/lib/useNow'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/batches/$id')({
   component: BatchPage,
@@ -14,94 +22,157 @@ function BatchPage() {
   const { id } = Route.useParams()
   const batch = useQuery(batchQuery(id))
 
-  if (batch.isPending) return <p className="text-stone-500">Loading...</p>
-  if (batch.isError) return <ErrorMessage error={batch.error} />
-
-  return <Batch detail={batch.data} />
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <Link to="/" className="flex w-fit items-center gap-1 font-heading hover:underline">
+        <ArrowLeft className="size-4" /> Today
+      </Link>
+      {batch.isPending ? (
+        <p className="font-heading">Loading...</p>
+      ) : batch.isError ? (
+        <ErrorAlert error={batch.error} />
+      ) : (
+        <Batch detail={batch.data} />
+      )}
+    </div>
+  )
 }
 
+const statusStyles = {
+  active: 'bg-main',
+  harvested: 'bg-due',
+  discarded: 'bg-overdue',
+} as const
+
 function Batch({ detail }: { detail: BatchDetail }) {
+  const now = useNow()
   const { batch, plant } = detail
-  const statusLabel =
-    batch.status === 'active'
-      ? stepLabels[batch.current_action]
-      : batch.status === 'harvested'
-        ? 'Harvested'
-        : 'Discarded'
+  const status = batch.status === 'active' ? stepLabels[batch.current_action] : batch.status
+  const progress = batch.harvest_window
+    ? percentBetween(batch.started_at, batch.harvest_window.earliest, now)
+    : 100
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <div className="flex items-start justify-between gap-3">
+    <>
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold">{plant.name}</h1>
-            {plant.name_lat && <p className="text-sm text-stone-500 italic">{plant.name_lat}</p>}
+            <h1 className="text-4xl tracking-tight">{plant.name}</h1>
+            {plant.name_lat && <p className="italic">{plant.name_lat}</p>}
           </div>
-          <span className="rounded-full bg-green-50 px-3 py-1 text-sm text-green-800">
-            {statusLabel}
-          </span>
+          <Badge className={cn('rotate-3 px-3 py-1 text-sm font-heading capitalize shadow-shadow', statusStyles[batch.status])}>
+            {status}
+          </Badge>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt className="text-stone-500">Container</dt>
-          <dd>{batch.container}</dd>
-          <dt className="text-stone-500">Seed</dt>
-          <dd>{batch.seed_g} g</dd>
-          <dt className="text-stone-500">Started</dt>
-          <dd>{formatWhen(batch.started_at)}</dd>
-          {batch.harvest_window && (
-            <>
-              <dt className="text-stone-500">Harvest</dt>
-              <dd>{formatWindow(batch.harvest_window.earliest, batch.harvest_window.latest)}</dd>
-            </>
-          )}
-        </dl>
-        {detail.notes && <p className="mt-4 text-sm whitespace-pre-wrap">{detail.notes}</p>}
-      </Card>
 
-      {batch.status === 'active' && (
-        <Card>
-          <SectionTitle>To do</SectionTitle>
-          <ul className="divide-y divide-stone-100">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Fact label="Container">{batch.container}</Fact>
+          <Fact label="Seed">{batch.seed_g} g</Fact>
+          <Fact label="Started">{formatWhen(batch.started_at, now)}</Fact>
+          <Fact label="Harvest">
+            {batch.harvest_window
+              ? formatWindow(batch.harvest_window.earliest, batch.harvest_window.latest, now)
+              : batch.status === 'harvested'
+                ? 'Done'
+                : 'Stopped'}
+          </Fact>
+        </dl>
+
+        {batch.status === 'active' && (
+          <Progress value={progress} aria-label="Progress to the earliest harvest" />
+        )}
+        {detail.notes && (
+          <p className="rounded-base border-2 border-border bg-secondary-background p-3 whitespace-pre-wrap">
+            {detail.notes}
+          </p>
+        )}
+      </section>
+
+      {batch.status === 'active' && detail.open_tasks.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-2xl">To do</h2>
+          <ul className="flex flex-col gap-3">
             {detail.open_tasks.map((task) => (
-              <TaskRow key={task.id} task={task} showBatch={false} />
+              <TaskCard key={task.id} task={task} showBatch={false} />
             ))}
           </ul>
-        </Card>
+        </section>
       )}
 
-      <Card>
-        <SectionTitle>Steps</SectionTitle>
-        <ol className="flex flex-col gap-3">
-          {plant.steps.map((step, index) => {
-            const record = detail.steps.find((entry) => entry.step_index === index)
-            const planned = detail.upcoming.find((window) => window.step_index === index)
-            const current = batch.status === 'active' && index === batch.current_step
-
-            return (
-              <li key={index} className={current ? 'font-medium' : record ? 'text-stone-500' : ''}>
-                <div className="flex justify-between gap-3">
-                  <span>
-                    {index + 1}. {stepNames[step.action]}
-                    {step.duration_min &&
-                      ` (${step.duration_min}${step.duration_max ? ` to ${step.duration_max}` : ''})`}
-                  </span>
-                  <span className="text-sm">
-                    {record
-                      ? formatWhen(record.started_at)
-                      : planned
-                        ? `~${formatWindow(planned.earliest_start, planned.latest_start)}`
-                        : ''}
-                  </span>
-                </div>
-                {step.note && <p className="text-sm font-normal text-stone-500">{step.note}</p>}
-              </li>
-            )
-          })}
-        </ol>
-      </Card>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-2xl">Steps</h2>
+        <Steps detail={detail} now={now} />
+      </section>
 
       {batch.status === 'active' && <DiscardButton id={batch.id} />}
+    </>
+  )
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="rounded-base border-2 border-border bg-secondary-background p-3 shadow-shadow">
+      <dt className="text-xs font-heading tracking-wide uppercase">{label}</dt>
+      <dd className="mt-1 truncate font-heading">{children}</dd>
     </div>
+  )
+}
+
+function Steps({ detail, now }: { detail: BatchDetail; now: Date }) {
+  const { batch, plant } = detail
+
+  return (
+    <ol className="relative flex flex-col gap-4 before:absolute before:top-2 before:bottom-2 before:left-[21px] before:w-0.5 before:bg-border">
+      {plant.steps.map((step, index) => {
+        const record = detail.steps.find((entry) => entry.step_index === index)
+        const planned = detail.upcoming.find((window) => window.step_index === index)
+        const current = batch.status === 'active' && index === batch.current_step
+        const done = record != null && !current
+        const Icon = done ? Check : stepIcons[step.action]
+
+        return (
+          <li key={index} className="relative flex gap-4">
+            <span
+              className={cn(
+                'z-10 grid size-11 shrink-0 place-items-center rounded-base border-2 border-border',
+                done && 'bg-main',
+                current && 'bg-due shadow-shadow',
+                !record && 'bg-secondary-background',
+              )}
+            >
+              <Icon className="size-5" />
+            </span>
+            <div
+              className={cn(
+                'flex-1 rounded-base border-2 border-border bg-secondary-background p-3',
+                current && 'shadow-shadow',
+                !record && 'border-dashed',
+              )}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-heading">
+                  {stepNames[step.action]}
+                  {step.duration_min && (
+                    <span className="ml-2 font-base text-sm">{formatRange(step.duration_min, step.duration_max)}</span>
+                  )}
+                </p>
+                <p className="text-sm">
+                  {record
+                    ? formatWhen(record.started_at, now)
+                    : planned
+                      ? `around ${formatWindow(planned.earliest_start, planned.latest_start, now)}`
+                      : ''}
+                </p>
+              </div>
+              {current && (
+                <Badge className="mt-2 bg-due font-heading uppercase">You are here</Badge>
+              )}
+              {step.note && <p className="mt-2 text-sm">{step.note}</p>}
+            </div>
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 
@@ -118,17 +189,16 @@ function DiscardButton({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <ErrorMessage error={discard.error} />
-      <button
-        type="button"
+      <ErrorAlert error={discard.error} />
+      <Button
+        variant="neutral"
         disabled={discard.isPending}
         onClick={() => {
           if (window.confirm('Discard this batch? Its reminders stop.')) discard.mutate()
         }}
-        className={`${secondaryButtonClass} text-red-700`}
       >
-        Discard batch
-      </button>
+        <Trash2 /> Discard batch
+      </Button>
     </div>
   )
 }

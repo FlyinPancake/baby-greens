@@ -12,6 +12,7 @@ export type BatchStatus = Schemas['BatchStatus']
 export type TaskView = Schemas['TaskView']
 export type TaskAction = Schemas['TaskAction']
 export type StepAction = Schemas['StepAction']
+export type CareAction = Schemas['CareAction']
 export type Problem = Schemas['Problem']
 export type ErrorBody = Schemas['ErrorBody']
 
@@ -83,14 +84,13 @@ export const batchQuery = (id: string) =>
     queryFn: () => unwrap(api.GET('/batches/{id}', { params: { path: { id } } })),
   })
 
-export const tasksQuery = (dueBefore: Date) =>
-  queryOptions({
-    queryKey: ['tasks', { dueBefore: dueBefore.toISOString() }],
-    queryFn: () =>
-      unwrap(api.GET('/tasks', { params: { query: { due_before: dueBefore.toISOString() } } })),
-    // Keep "due" and "overdue" labels current while the page stays open.
-    refetchInterval: 60 * 1000,
-  })
+/** Every open task on active batches, soonest first. */
+export const tasksQuery = queryOptions({
+  queryKey: ['tasks'],
+  queryFn: () => unwrap(api.GET('/tasks')),
+  // Picks up changes made on another device while the page stays open.
+  refetchInterval: 60 * 1000,
+})
 
 export async function logout(): Promise<void> {
   const response = await fetch('/auth/logout', { method: 'POST' })

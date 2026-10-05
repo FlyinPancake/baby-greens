@@ -55,7 +55,7 @@ Home growing only. No selling, orders, or customer features.
 | Routing | TanStack Router |
 | Server state | TanStack Query, with the cache saved to IndexedDB and mutations queued while offline |
 | PWA | `vite-plugin-pwa` (Workbox) |
-| UI | Tailwind and shadcn/ui, phone layout first |
+| UI | Tailwind 4 with [neobrutalism.dev](https://www.neobrutalism.dev) components (shadcn registry, green style), Space Grotesk, lucide icons |
 | API client | `openapi-fetch` with types from `openapi-typescript` |
 
 ### Rejected alternatives

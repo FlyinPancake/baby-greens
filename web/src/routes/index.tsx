@@ -1,60 +1,111 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMemo } from 'react'
-import { BatchRow } from '../components/BatchRow'
-import { TaskRow } from '../components/TaskRow'
-import { buttonClass, Card, ErrorMessage, SectionTitle } from '../components/ui'
-import { batchesQuery, tasksQuery } from '../lib/api'
-import { endOfToday } from '../lib/time'
+import { CalendarCheck, Plus, Sprout } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { BatchCard } from '@/components/BatchCard'
+import { EmptyState } from '@/components/EmptyState'
+import { ErrorAlert } from '@/components/ErrorAlert'
+import { Highlight } from '@/components/PageHeading'
+import { TaskCard } from '@/components/TaskCard'
+import { Button } from '@/components/ui/button'
+import { batchesQuery, meQuery, tasksQuery } from '@/lib/api'
+import { taskLabel } from '@/lib/labels'
+import { endOfToday, formatWhen, formatWindow } from '@/lib/time'
+import { useNow } from '@/lib/useNow'
 
 export const Route = createFileRoute('/')({
   component: Today,
 })
 
+function greeting(now: Date): string {
+  const hour = now.getHours()
+  if (hour < 5) return 'Up late'
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 function Today() {
-  // Computing this on every render would change the query key, so keep it for the life of the page.
-  const dueBefore = useMemo(() => endOfToday(), [])
-  const tasks = useQuery(tasksQuery(dueBefore))
+  const now = useNow()
+  const me = useQuery(meQuery)
+  const tasks = useQuery(tasksQuery)
   const batches = useQuery(batchesQuery('active'))
 
-  return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <SectionTitle>Today</SectionTitle>
-        <ErrorMessage error={tasks.error} />
-        {tasks.isPending ? (
-          <p className="text-stone-500">Loading...</p>
-        ) : tasks.data?.length === 0 ? (
-          <p className="text-stone-500">Nothing left to do today.</p>
-        ) : (
-          <ul className="divide-y divide-stone-100">
-            {tasks.data?.map((task) => (
-              <TaskRow key={task.id} task={task} />
-            ))}
-          </ul>
-        )}
-      </Card>
+  const endOfDay = endOfToday(now)
+  const today = tasks.data?.filter((task) => new Date(task.due_at) <= endOfDay) ?? []
+  const nextUp = tasks.data?.find((task) => new Date(task.due_at) > endOfDay)
+  const nextHarvest = batches.data
+    ?.flatMap((batch) => (batch.harvest_window ? [batch.harvest_window] : []))
+    .sort((a, b) => a.earliest.localeCompare(b.earliest))[0]
 
-      <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <SectionTitle>Growing</SectionTitle>
-          <Link to="/batches/new" className={buttonClass}>
-            Start a batch
-          </Link>
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-8">
+      <section className="flex flex-col gap-4">
+        <h1 className="text-4xl tracking-tight sm:text-5xl">
+          {greeting(now)}, <Highlight>{me.data?.display_name}</Highlight>
+        </h1>
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="To do today" value={tasks.isPending ? '…' : today.length} tone="bg-due" />
+          <Stat label="Growing" value={batches.isPending ? '…' : (batches.data?.length ?? 0)} tone="bg-main" />
+          <Stat
+            label="Next harvest"
+            value={nextHarvest ? formatWindow(nextHarvest.earliest, nextHarvest.latest, now) : 'None yet'}
+            tone="bg-secondary-background"
+          />
         </div>
-        <ErrorMessage error={batches.error} />
-        {batches.isPending ? (
-          <p className="text-stone-500">Loading...</p>
-        ) : batches.data?.length === 0 ? (
-          <p className="text-stone-500">No batches growing. Start one to get reminders.</p>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-2xl">Today</h2>
+        <ErrorAlert error={tasks.error} />
+        {tasks.isPending ? (
+          <p className="font-heading">Loading...</p>
+        ) : today.length === 0 ? (
+          <EmptyState icon={CalendarCheck} title="All done for today">
+            {nextUp
+              ? `Next up: ${taskLabel(nextUp).toLowerCase()} for ${nextUp.plant_name}, ${formatWhen(nextUp.due_at, now)}.`
+              : 'Start a batch to get reminders.'}
+          </EmptyState>
         ) : (
-          <ul className="divide-y divide-stone-100">
-            {batches.data?.map((batch) => (
-              <BatchRow key={batch.id} batch={batch} />
+          <ul className="flex flex-col gap-3">
+            {today.map((task) => (
+              <TaskCard key={task.id} task={task} />
             ))}
           </ul>
         )}
-      </Card>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-2xl">Growing</h2>
+          <Button nativeButton={false} render={<Link to="/batches/new" />}>
+            <Plus /> Start a batch
+          </Button>
+        </div>
+        <ErrorAlert error={batches.error} />
+        {batches.isPending ? (
+          <p className="font-heading">Loading...</p>
+        ) : batches.data?.length === 0 ? (
+          <EmptyState icon={Sprout} title="Nothing growing yet">
+            Pick a plant, fill a jar or tray, and start a batch.
+          </EmptyState>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {batches.data?.map((batch) => (
+              <BatchCard key={batch.id} batch={batch} />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function Stat({ label, value, tone }: { label: string; value: ReactNode; tone: string }) {
+  return (
+    <div className={`rounded-base border-2 border-border p-3 shadow-shadow ${tone}`}>
+      <p className="text-[10px] font-heading tracking-wide uppercase sm:text-xs">{label}</p>
+      <p className="mt-1 font-heading text-xl leading-tight break-words sm:text-3xl">{value}</p>
     </div>
   )
 }

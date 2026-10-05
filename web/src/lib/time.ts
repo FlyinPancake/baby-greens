@@ -42,3 +42,26 @@ export function toLocalInput(date: Date): string {
   const offset = date.getTimezoneOffset() * 60_000
   return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
+
+/** Shortens humantime output for display: "2days" becomes "2d", "1day 12h" becomes "1d 12h". */
+export function formatSpan(span: string): string {
+  return span
+    .replace(/(\d+)\s*(?:days?|d)\b/g, '$1d')
+    .replace(/(\d+)\s*(?:hours?|hr|h)\b/g, '$1h')
+    .replace(/(\d+)\s*(?:minutes?|min|m)\b/g, '$1m')
+    .replace(/(\d+)\s*(?:weeks?|w)\b/g, '$1w')
+}
+
+/** "8h to 12h", or one span when there's no maximum. */
+export function formatRange(min: string | null | undefined, max: string | null | undefined): string {
+  if (!min) return ''
+  return max ? `${formatSpan(min)} to ${formatSpan(max)}` : formatSpan(min)
+}
+
+/** How far `now` is from `start` to `end`, from 0 to 100. */
+export function percentBetween(startIso: string, endIso: string, now: Date): number {
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  if (end <= start) return 100
+  return Math.min(100, Math.max(0, ((now.getTime() - start) / (end - start)) * 100))
+}
