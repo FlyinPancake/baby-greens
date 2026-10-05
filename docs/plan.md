@@ -169,7 +169,9 @@ Rust enums with `sqlx::Type`.
   `note` are optional.
 - Step actions are `soak`, `sprout`, `blackout`, `light`, and `harvest`. Care actions are `rinse`,
   `water`, and `mist`.
-- Durations are a whole number and a unit: `30m`, `12h`, or `4d`.
+- Durations use [humantime](https://docs.rs/humantime) syntax, like `30m`, `12h`, `4d`, or `1d 12h`,
+  and must be longer than zero. Saved definitions use humantime's own formatting, so `36h` comes
+  back as `1day 12h`.
 - Every step except the last needs `duration_min`. `duration_max` is optional and can't be shorter.
   The last step must be `harvest`, with no durations or care. Each care action can appear once per
   step.

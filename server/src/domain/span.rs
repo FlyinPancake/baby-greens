@@ -1,36 +1,35 @@
-use std::{fmt, str::FromStr};
+use std::{fmt, str::FromStr, time::Duration as StdDuration};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use time::Duration;
 
-/// A duration in a plant definition, written as a whole number and a unit: `30m`, `12h`, or `4d`.
+/// A duration in a plant definition, in humantime syntax: `30m`, `12h`, `4d`, or `1d 12h`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Span {
-    minutes: u32,
-}
+pub struct Span(StdDuration);
 
 impl Span {
-    pub const fn minutes(minutes: u32) -> Self {
-        Self { minutes }
+    pub const fn minutes(minutes: u64) -> Self {
+        Self(StdDuration::from_secs(minutes * 60))
     }
 
-    pub const fn hours(hours: u32) -> Self {
+    pub const fn hours(hours: u64) -> Self {
         Self::minutes(hours * 60)
     }
 
-    pub const fn days(days: u32) -> Self {
+    pub const fn days(days: u64) -> Self {
         Self::hours(days * 24)
     }
 
     pub fn as_duration(self) -> Duration {
-        Duration::minutes(self.minutes.into())
+        // Parsing rejects spans that don't fit, and the constructors only take small values.
+        Duration::try_from(self.0).expect("span fits in time::Duration")
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum SpanError {
-    #[error("expected a whole number followed by m, h, or d, like \"12h\"")]
-    Format,
+    #[error(transparent)]
+    Parse(#[from] humantime::DurationError),
     #[error("must be longer than zero")]
     Zero,
     #[error("is too long")]
@@ -41,43 +40,20 @@ impl FromStr for Span {
     type Err = SpanError;
 
     fn from_str(text: &str) -> Result<Self, SpanError> {
-        if !text.is_ascii() || text.len() < 2 {
-            return Err(SpanError::Format);
-        }
-
-        let (number, unit) = text.split_at(text.len() - 1);
-        if !number.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(SpanError::Format);
-        }
-
-        let minutes_per_unit = match unit {
-            "m" => 1,
-            "h" => 60,
-            "d" => 24 * 60,
-            _ => return Err(SpanError::Format),
-        };
-
-        let value: u32 = number.parse().map_err(|_| SpanError::TooLong)?;
-        if value == 0 {
+        let duration = humantime::parse_duration(text)?;
+        if duration.is_zero() {
             return Err(SpanError::Zero);
         }
-
-        let minutes = value
-            .checked_mul(minutes_per_unit)
-            .ok_or(SpanError::TooLong)?;
-        Ok(Self { minutes })
+        if Duration::try_from(duration).is_err() {
+            return Err(SpanError::TooLong);
+        }
+        Ok(Self(duration))
     }
 }
 
-/// Uses the largest unit that divides the span evenly, so `24h` prints as `1d`.
 impl fmt::Display for Span {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        const DAY: u32 = 24 * 60;
-        match self.minutes {
-            minutes if minutes % DAY == 0 => write!(f, "{}d", minutes / DAY),
-            minutes if minutes % 60 == 0 => write!(f, "{}h", minutes / 60),
-            minutes => write!(f, "{minutes}m"),
-        }
+        humantime::format_duration(self.0).fmt(f)
     }
 }
 
@@ -99,38 +75,55 @@ impl<'de> Deserialize<'de> for Span {
 mod tests {
     use super::*;
 
+    fn parse(text: &str) -> Span {
+        text.parse()
+            .unwrap_or_else(|error| panic!("{text:?}: {error}"))
+    }
+
     #[test]
-    fn parses_each_unit() {
-        assert_eq!("45m".parse(), Ok(Span::minutes(45)));
-        assert_eq!("12h".parse(), Ok(Span::hours(12)));
-        assert_eq!("4d".parse(), Ok(Span::days(4)));
+    fn parses_humantime_syntax() {
+        assert_eq!(parse("45m"), Span::minutes(45));
+        assert_eq!(parse("12h"), Span::hours(12));
+        assert_eq!(parse("4d"), Span::days(4));
+        assert_eq!(parse("1d 12h"), Span::hours(36));
+        assert_eq!(parse("1d12h"), Span::hours(36));
+        assert_eq!(parse("90min"), Span::minutes(90));
     }
 
     #[test]
     fn rejects_bad_input() {
-        for text in [
-            "", "h", "12", "1.5h", "-2h", "12 h", "12H", "1d12h", "3w", "١٢h",
-        ] {
-            assert_eq!(text.parse::<Span>(), Err(SpanError::Format), "{text:?}");
+        for text in ["", "h", "12", "-2h", "12H", "twelve hours"] {
+            assert!(
+                matches!(text.parse::<Span>(), Err(SpanError::Parse(_))),
+                "{text:?}"
+            );
         }
-        assert_eq!("0h".parse::<Span>(), Err(SpanError::Zero));
-        assert_eq!("99999999999d".parse::<Span>(), Err(SpanError::TooLong));
-        assert_eq!("4000000d".parse::<Span>(), Err(SpanError::TooLong));
+        assert!(matches!("0h".parse::<Span>(), Err(SpanError::Zero)));
+        // Fits in std's Duration but not in time's, which the scheduler uses.
+        assert!(matches!(
+            "400000000000years".parse::<Span>(),
+            Err(SpanError::TooLong)
+        ));
     }
 
     #[test]
-    fn displays_the_largest_even_unit() {
-        assert_eq!(Span::hours(24).to_string(), "1d");
-        assert_eq!(Span::hours(36).to_string(), "36h");
-        assert_eq!(Span::minutes(90).to_string(), "90m");
+    fn displays_in_humantime_format() {
+        assert_eq!(Span::hours(12).to_string(), "12h");
+        assert_eq!(Span::hours(36).to_string(), "1day 12h");
+        assert_eq!(Span::days(4).to_string(), "4days");
     }
 
     #[test]
     fn round_trips_through_json() {
-        let span: Span = serde_json::from_str("\"8h\"").unwrap();
-        assert_eq!(serde_json::to_string(&span).unwrap(), "\"8h\"");
+        let span: Span = serde_json::from_str("\"1d 12h\"").unwrap();
+        let json = serde_json::to_string(&span).unwrap();
+        assert_eq!(json, "\"1day 12h\"");
+        assert_eq!(serde_json::from_str::<Span>(&json).unwrap(), span);
 
-        let error = serde_json::from_str::<Span>("\"8 hours\"").unwrap_err();
-        assert!(error.to_string().contains("invalid duration \"8 hours\""));
+        let error = serde_json::from_str::<Span>("\"8 hourz\"").unwrap_err();
+        assert!(
+            error.to_string().contains("invalid duration \"8 hourz\""),
+            "{error}"
+        );
     }
 }
