@@ -53,7 +53,7 @@ Home growing only. No selling, orders, or customer features.
 | --- | --- |
 | Build | Vite, React, TypeScript |
 | Routing | TanStack Router |
-| Server state | TanStack Query, with the cache saved to IndexedDB and mutations queued while offline |
+| Server state | TanStack Query, with the cache saved to IndexedDB. Ticks, snoozes, and harvests go through an outbox while offline. See "Offline" |
 | PWA | `vite-plugin-pwa` (Workbox) |
 | UI | Tailwind 4 with [neobrutalism.dev](https://www.neobrutalism.dev) components (shadcn registry, green style), Space Grotesk, lucide icons |
 | API client | `openapi-fetch` with types from `openapi-typescript` |
@@ -86,8 +86,11 @@ The JSON API lives under `/api/v1`, so a future native app can stay on `v1` whil
 | GET, POST | `/containers` | List the household's jars and trays with what grows in them, or add one |
 | GET, PATCH, DELETE | `/containers/{id}` | Read, rename, archive, or restore one. DELETE only works without history |
 | GET | `/tasks?due_before=` | Open tasks on active batches, soonest first |
-| POST | `/tasks/{id}/complete` | Finish a care chore, or advance the batch for an advance task |
+| POST | `/tasks/{id}/complete?done_at=` | Finish a care chore, or advance the batch for an advance task. `done_at` backdates it, up to 7 days |
 | POST | `/tasks/{id}/snooze` | Push a task back, up to a week. It gets a new reminder when the snooze ends |
+| POST | `/batches/{id}/harvests` | Log a cut from a harvested batch: grams, an optional 1 to 5 rating, and notes |
+| DELETE | `/harvests/{id}` | Remove a logged harvest |
+| GET | `/stats/plants` | Per plant: harvested batches, seed and yield grams, yield ratio, average rating and days |
 | GET | `/push/key` | The VAPID public key, or null when push is off |
 | POST, DELETE | `/push/subscriptions` | Save or forget this device's push subscription |
 | POST | `/push/test` | Send a test notification to all of your devices |
@@ -118,6 +121,30 @@ The service worker (`web/src/sw.ts`) precaches the app, shows pushed messages, a
 page when one is tapped. Push needs a secure context, so it works on localhost and over https, but
 not over plain http on the tailnet.
 
+## Offline
+
+The Query cache is saved to IndexedDB (`baby-greens-cache`) and kept for 7 days, so the app opens
+with the last data it loaded. After it's restored, every query refetches, so a stale copy never
+outlives a working connection.
+
+Ticking a task, snoozing it, and logging a harvest go through an outbox (`web/src/lib/outbox.ts`),
+also in IndexedDB. Online with an empty queue, a change goes straight out. Otherwise it waits, and
+the screen applies it right away: ticked tasks disappear and snoozed ones move. The outbox sends in
+order when the browser comes online, when the app becomes visible, and every 30 seconds. It stops
+at the first change that has to wait:
+
+- A network error, 5xx, or 429 leaves the change queued for the next try.
+- A 401 leaves it queued and shows a banner asking the user to sign in again. The queue survives
+  the login redirect and goes out once the session is back.
+- Any other 4xx drops the change and tells the user why, for example a task someone else already
+  finished.
+
+Ticks carry the time they were made as `done_at`, so a step that syncs late still starts when the
+user actually moved the jar. The server clamps it to the step's start. Signing out asks first when
+changes are waiting, then clears the queue, so they can't go out under another account.
+
+Everything else, like starting a batch or editing a plant, needs a connection and says so.
+
 ## Authentication
 
 The server never stores passwords. All interactive login goes through the OIDC provider (Pocket ID,
@@ -146,6 +173,11 @@ The server is a confidential OIDC client. The browser never sees an OIDC token.
 
 For CSRF protection, the server rejects any request other than GET whose `Origin` header doesn't
 match the app's origin.
+
+Only `/api` and `/auth` sit behind the session layer. Sessions save on every request so the idle
+timeout counts from the last visit, and static files would otherwise re-send the session cookie
+too. When the service worker fetched assets during a login, one of those responses could land after
+the callback and put the old, signed-out session id back.
 
 When a session expires while the PWA is offline, the app keeps showing cached data and queued ticks.
 When it's back online, it gets a 401, sends the user through login, and then replays the queue.

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { batchesQuery, meQuery, tasksQuery } from '@/lib/api'
 import { taskLabel } from '@/lib/labels'
 import { endOfToday, formatWhen, formatWindow } from '@/lib/time'
+import { usePendingTasks } from '@/lib/useOutbox'
 import { useNow } from '@/lib/useNow'
 
 export const Route = createFileRoute('/')({
@@ -33,8 +34,9 @@ function Today() {
   const batches = useQuery(batchesQuery({ status: 'active' }))
 
   const endOfDay = endOfToday(now)
-  const today = tasks.data?.filter((task) => new Date(task.due_at) <= endOfDay) ?? []
-  const nextUp = tasks.data?.find((task) => new Date(task.due_at) > endOfDay)
+  const open = usePendingTasks(tasks.data)
+  const today = open.filter((task) => new Date(task.due_at) <= endOfDay)
+  const nextUp = open.find((task) => new Date(task.due_at) > endOfDay)
   const nextHarvest = batches.data
     ?.flatMap((batch) => (batch.harvest_window ? [batch.harvest_window] : []))
     .sort((a, b) => a.earliest.localeCompare(b.earliest))[0]

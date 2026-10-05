@@ -68,6 +68,8 @@ pub struct BatchDetail {
     /// Planned windows from the current step to harvest. Empty unless the batch is active.
     pub upcoming: Vec<StepWindow>,
     pub open_tasks: Vec<TaskView>,
+    /// Logged harvests, oldest first.
+    pub harvests: Vec<super::harvests::Harvest>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -257,6 +259,7 @@ pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail,
     };
 
     let open_tasks = open_tasks(pool, user_id, None, Some(id)).await?;
+    let harvests = super::harvests::for_batch(pool, id).await?;
 
     Ok(BatchDetail {
         batch: summary,
@@ -265,6 +268,7 @@ pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail,
         steps,
         upcoming,
         open_tasks,
+        harvests,
     })
 }
 
@@ -379,22 +383,25 @@ pub async fn create(pool: &PgPool, user_id: Uuid, batch: NewBatch) -> Result<Uui
     Ok(id)
 }
 
-/// Marks a task done. A care task schedules its next occurrence. An advance task moves the
-/// batch into its next step.
+/// Marks a task done at `done_at`. A care task schedules its next occurrence. An advance task
+/// moves the batch into its next step. A time before the current step began counts as its start,
+/// which can happen when an offline tick syncs late.
 pub async fn complete_task(
     pool: &PgPool,
     user_id: Uuid,
     task_id: Uuid,
-    now: OffsetDateTime,
+    done_at: OffsetDateTime,
 ) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
 
     let task = sqlx::query!(
         r#"
         SELECT t.batch_id, t.step_index, t.kind::text AS "kind!", t.action, t.done_at,
-               b.current_step, b.status AS "status: BatchStatus", b.plant AS "plant: Json<Plant>"
+               b.current_step, b.status AS "status: BatchStatus", b.plant AS "plant: Json<Plant>",
+               s.started_at AS step_started_at
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
+        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
         WHERE t.id = $1 AND b.user_id = $2
         FOR UPDATE OF t, b
         "#,
@@ -419,6 +426,7 @@ pub async fn complete_task(
         .with_context(|| format!("task {task_id} has an unknown action"))?;
     let plant = task.plant.0;
     let step_index = index(task.step_index)?;
+    let now = done_at.max(task.step_started_at);
 
     sqlx::query!("UPDATE tasks SET done_at = $2 WHERE id = $1", task_id, now)
         .execute(&mut *tx)
@@ -963,5 +971,35 @@ mod tests {
             snooze_task(&pool, other, task.id, until, now).await,
             Err(AppError::NotFound)
         ));
+    }
+
+    #[sqlx::test]
+    async fn late_ticks_keep_their_time_but_not_before_the_step(pool: PgPool) {
+        let user_id = user(&pool, "grower").await;
+        let id = alfalfa_batch(&pool, user_id).await;
+        let drain = tasks(&pool, user_id, id).await[0].id;
+        complete_task(&pool, user_id, drain, datetime!(2026-10-05 18:00 UTC))
+            .await
+            .unwrap();
+
+        // A rinse done offline at 19:00 schedules the next one from 19:00.
+        let rinse = tasks(&pool, user_id, id).await[0].id;
+        complete_task(&pool, user_id, rinse, datetime!(2026-10-05 19:00 UTC))
+            .await
+            .unwrap();
+        assert_eq!(
+            tasks(&pool, user_id, id).await[0].due_at,
+            datetime!(2026-10-06 07:00 UTC)
+        );
+
+        // A time before the step began counts as its start.
+        let next = tasks(&pool, user_id, id).await[0].id;
+        complete_task(&pool, user_id, next, datetime!(2026-10-05 10:00 UTC))
+            .await
+            .unwrap();
+        assert_eq!(
+            tasks(&pool, user_id, id).await[0].due_at,
+            datetime!(2026-10-06 06:00 UTC)
+        );
     }
 }

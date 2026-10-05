@@ -3,6 +3,7 @@ import { createRootRouteWithContext, Link, Outlet, useSearch } from '@tanstack/r
 import { CalendarCheck, Container, type LucideIcon, Settings, Sprout } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
+import { SyncBanner } from '@/components/SyncBanner'
 import { Highlight } from '@/components/PageHeading'
 import { Button } from '@/components/ui/button'
 import { loginUrl, meQuery } from '@/lib/api'
@@ -43,14 +44,16 @@ function RootLayout() {
             </div>
           )}
         </div>
+        <SyncBanner />
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {me.isPending ? (
+        {/* Cached data wins over a failed refresh, so the app keeps working offline. */}
+        {me.data ? (
+          <Outlet />
+        ) : me.isPending ? (
           <p className="font-heading">Loading...</p>
         ) : me.isError ? (
           <ErrorAlert error={me.error} />
-        ) : me.data ? (
-          <Outlet />
         ) : (
           <SignIn />
         )}

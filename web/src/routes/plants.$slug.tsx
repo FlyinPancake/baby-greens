@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { MobileActionBar } from '@/components/MobileActionBar'
 import { PlantEditor } from '@/components/PlantEditor'
+import { PlantResults } from '@/components/PlantResults'
 import { Segmented } from '@/components/Segmented'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -178,6 +179,7 @@ function PlantWorkbench({ slug, entry }: { slug: string; entry: LibraryEntry | u
 
       <aside className="flex flex-col gap-4 lg:sticky lg:top-24">
         <Preview plant={plant} />
+        {entry && <PlantResults slug={slug} />}
 
         <ErrorAlert error={save.error ?? remove.error} />
 

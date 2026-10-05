@@ -63,3 +63,90 @@ export async function sweepTestPlants(page: Page): Promise<void> {
     }
   })
 }
+
+/**
+ * Makes sure this project's test jar exists and isn't archived, and returns its name. Reusing one
+ * jar per project keeps test runs from piling up containers in the shared household list.
+ */
+export async function testJar(page: Page, project: string): Promise<string> {
+  const name = `e2e jar ${project}`
+  await page.goto('/containers')
+  await page.evaluate(async (name) => {
+    type Container = {
+      id: string
+      name: string
+      archived_at: string | null
+      occupant: { batch_id: string | null } | null
+    }
+    const containers: Container[] = await fetch('/api/v1/containers').then((response) =>
+      response.json(),
+    )
+    const existing = containers.find((container) => container.name === name)
+    const headers = { 'content-type': 'application/json' }
+    // A run that died halfway can leave its batch growing in the jar.
+    if (existing?.occupant?.batch_id) {
+      await fetch(`/api/v1/batches/${existing.occupant.batch_id}/discard`, { method: 'POST' })
+    }
+    if (!existing) {
+      await fetch('/api/v1/containers', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name, kind: 'jar' }),
+      })
+    } else if (existing.archived_at) {
+      await fetch(`/api/v1/containers/${existing.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ archived: false }),
+      })
+    }
+  }, name)
+  return name
+}
+
+/** Starts a batch through the API and returns its id. The page must be on the app. */
+export async function startBatch(
+  page: Page,
+  plantSlug: string,
+  jarName: string,
+  hoursAgo: number,
+): Promise<string> {
+  return page.evaluate(
+    async ({ plantSlug, jarName, hoursAgo }) => {
+      const containers: { id: string; name: string }[] = await fetch('/api/v1/containers').then(
+        (response) => response.json(),
+      )
+      const jar = containers.find((container) => container.name === jarName)
+      const started = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString()
+      const response = await fetch('/api/v1/batches', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ plant_slug: plantSlug, container_id: jar?.id, started_at: started }),
+      })
+      if (!response.ok) throw new Error(`starting a batch failed with ${response.status}`)
+      return (await response.json()).batch.id as string
+    },
+    { plantSlug, jarName, hoursAgo },
+  )
+}
+
+/** Discards a batch if it's still active, and archives its jar, so the next run starts clean. */
+export async function cleanUp(page: Page, batchId: string, jarName: string): Promise<void> {
+  await page.evaluate(
+    async ({ batchId, jarName }) => {
+      await fetch(`/api/v1/batches/${batchId}/discard`, { method: 'POST' })
+      const containers: { id: string; name: string }[] = await fetch('/api/v1/containers').then(
+        (response) => response.json(),
+      )
+      const jar = containers.find((container) => container.name === jarName)
+      if (jar) {
+        await fetch(`/api/v1/containers/${jar.id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ archived: true }),
+        })
+      }
+    },
+    { batchId, jarName },
+  )
+}

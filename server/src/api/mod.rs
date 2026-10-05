@@ -5,6 +5,7 @@ mod account;
 mod batches;
 mod containers;
 mod extract;
+mod harvests;
 mod plants;
 mod push;
 mod tasks;
@@ -59,6 +60,7 @@ fn v1() -> OpenApiRouter<AppState> {
         .merge(plants::router())
         .merge(batches::router())
         .merge(containers::router())
+        .merge(harvests::router())
         .merge(tasks::router())
         .merge(push::router())
 }
@@ -119,14 +121,17 @@ mod tests {
                 "/batches",
                 "/batches/{id}",
                 "/batches/{id}/discard",
+                "/batches/{id}/harvests",
                 "/containers",
                 "/containers/{id}",
+                "/harvests/{id}",
                 "/me",
                 "/plants",
                 "/plants/{slug}",
                 "/push/key",
                 "/push/subscriptions",
                 "/push/test",
+                "/stats/plants",
                 "/tasks",
                 "/tasks/{id}/complete",
                 "/tasks/{id}/snooze",

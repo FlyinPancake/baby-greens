@@ -21,8 +21,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { api, logout, type Me, meQuery, unwrap } from '@/lib/api'
 import { canInstall, install, onInstallChange } from '@/lib/install'
+import { clearOutbox } from '@/lib/outbox'
 import { disablePush, enablePush, type PushState, pushState } from '@/lib/push'
 import { onThemeChange, setThemeChoice, themeChoice } from '@/lib/theme'
+import { useOutbox } from '@/lib/useOutbox'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/settings')({
@@ -38,7 +40,14 @@ function Settings() {
         <Highlight>Settings</Highlight>
       </PageHeading>
       <Reminders />
-      {me.data && <Schedule me={me.data} />}
+      {me.data && (
+        // Start the form over when the saved settings change, for example when fresh ones
+        // replace what was cached from before the last save.
+        <Schedule
+          key={JSON.stringify([me.data.timezone, me.data.quiet_hours])}
+          me={me.data}
+        />
+      )}
       <Appearance />
       <InstallApp />
       {me.data && <Account me={me.data} />}
@@ -317,13 +326,28 @@ function InstallApp() {
 
 function Account({ me }: { me: Me }) {
   const queryClient = useQueryClient()
+  const { entries } = useOutbox()
   const signOut = useMutation({
     mutationFn: logout,
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Waiting changes belong to this account, so they mustn't go out after someone else signs in.
+      await clearOutbox()
       queryClient.clear()
       queryClient.setQueryData(meQuery.queryKey, null)
     },
   })
+
+  function confirmSignOut() {
+    const waiting = entries.length
+    if (
+      waiting === 0 ||
+      window.confirm(
+        `${waiting} ${waiting === 1 ? 'change' : 'changes'} made offline haven't synced yet and will be lost. Sign out anyway?`,
+      )
+    ) {
+      signOut.mutate()
+    }
+  }
 
   return (
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-base border-2 border-dashed border-border p-5">
@@ -331,7 +355,7 @@ function Account({ me }: { me: Me }) {
         <p className="font-heading">Signed in as {me.display_name}</p>
         {me.email && <p className="text-sm">{me.email}</p>}
       </div>
-      <Button variant="neutral" onClick={() => signOut.mutate()} disabled={signOut.isPending}>
+      <Button variant="neutral" onClick={confirmSignOut} disabled={signOut.isPending}>
         <LogOut /> Sign out
       </Button>
     </section>

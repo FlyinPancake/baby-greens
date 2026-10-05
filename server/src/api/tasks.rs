@@ -87,6 +87,16 @@ async fn list_tasks(
     Ok(Json(tasks))
 }
 
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+struct CompleteQuery {
+    /// When it was done, for ticks made offline that sync later. Defaults to now. At most a week
+    /// ago, and not in the future.
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    #[param(value_type = Option<String>, format = DateTime)]
+    done_at: Option<OffsetDateTime>,
+}
+
 /// Mark a task done. Finishing a care task schedules the next one. Finishing an advance task
 /// moves the batch into its next step, and moving into harvest ends the batch.
 #[utoipa::path(
@@ -94,9 +104,10 @@ async fn list_tasks(
     path = "/tasks/{id}/complete",
     tag = "tasks",
     security(("session" = [])),
-    params(("id" = Uuid, Path)),
+    params(("id" = Uuid, Path), CompleteQuery),
     responses(
         (status = 204, description = "Done"),
+        (status = 400, body = ErrorBody),
         (status = 401, body = ErrorBody),
         (status = 404, body = ErrorBody),
         (
@@ -104,13 +115,27 @@ async fn list_tasks(
             description = "The task is already done (`task_done`), or its batch has moved on (`batch_not_active`, `stale_task`)",
             body = ErrorBody,
         ),
+        (status = 422, description = "`done_at` is in the future or more than a week ago", body = ErrorBody),
     ),
 )]
 async fn complete_task(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
     Path(id): Path<Uuid>,
+    Query(query): Query<CompleteQuery>,
 ) -> Result<StatusCode, AppError> {
-    batches::complete_task(&state.pool, user.id, id, OffsetDateTime::now_utc()).await?;
+    let now = OffsetDateTime::now_utc();
+    let done_at = query.done_at.unwrap_or(now);
+    // A little slack for device clocks that run slightly ahead.
+    if done_at > now + time::Duration::minutes(5) {
+        return Err(AppError::invalid("done_at", "can't be in the future"));
+    }
+    if done_at < now - time::Duration::days(7) {
+        return Err(AppError::invalid(
+            "done_at",
+            "can't be more than a week ago",
+        ));
+    }
+    batches::complete_task(&state.pool, user.id, id, done_at).await?;
     Ok(StatusCode::NO_CONTENT)
 }

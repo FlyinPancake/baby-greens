@@ -1,45 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { deleteTestPlant, saveTestPlant } from './fixtures'
-
-/**
- * Makes sure this project's test jar exists and isn't archived, and returns its name. Reusing one
- * jar per project keeps test runs from piling up containers in the shared household list.
- */
-async function testJar(page: Page, project: string): Promise<string> {
-  const name = `e2e jar ${project}`
-  await page.goto('/containers')
-  await page.evaluate(async (name) => {
-    type Container = {
-      id: string
-      name: string
-      archived_at: string | null
-      occupant: { batch_id: string | null } | null
-    }
-    const containers: Container[] = await fetch('/api/v1/containers').then((response) =>
-      response.json(),
-    )
-    const existing = containers.find((container) => container.name === name)
-    const headers = { 'content-type': 'application/json' }
-    // A run that died halfway can leave its batch growing in the jar.
-    if (existing?.occupant?.batch_id) {
-      await fetch(`/api/v1/batches/${existing.occupant.batch_id}/discard`, { method: 'POST' })
-    }
-    if (!existing) {
-      await fetch('/api/v1/containers', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ name, kind: 'jar' }),
-      })
-    } else if (existing.archived_at) {
-      await fetch(`/api/v1/containers/${existing.id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ archived: false }),
-      })
-    }
-  }, name)
-  return name
-}
+import { deleteTestPlant, saveTestPlant, testJar } from './fixtures'
 
 const plantPicker = (page: Page) => page.getByRole('radiogroup', { name: 'Plant' })
 
@@ -50,7 +10,7 @@ test('start a batch, advance it, and discard it', async ({ page }, testInfo) => 
 
   await page.goto('/batches/new')
   await plantPicker(page).getByRole('radio', { name: plant.name }).click()
-  await page.getByRole('radio', { name: jar }).click()
+  await page.getByRole('radio', { name: jar, exact: true }).click()
   await expect(page.getByRole('spinbutton', { name: 'Seed in grams' })).toHaveValue('60')
   await page.getByRole('button', { name: /Start/ }).last().click()
 
@@ -70,7 +30,7 @@ test('start a batch, advance it, and discard it', async ({ page }, testInfo) => 
   await expect(page.getByText(/^snoozed until /)).toBeVisible()
 
   // The container page shows the jar as busy.
-  await page.getByRole('link', { name: jar }).click()
+  await page.getByRole('link', { name: jar, exact: true }).click()
   await expect(page.getByRole('heading', { name: jar })).toBeVisible()
   await expect(page.getByText('growing', { exact: true })).toBeVisible()
   await page.goBack()
@@ -81,7 +41,9 @@ test('start a batch, advance it, and discard it', async ({ page }, testInfo) => 
 
   // Discarding frees the jar. It has history, so it gets archived rather than deleted.
   await page.goto('/containers')
-  const card = page.getByRole('listitem').filter({ hasText: jar })
+  const card = page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('link', { name: jar, exact: true }) })
   await expect(card.getByText('Free')).toBeVisible()
   await card.getByRole('button', { name: 'Archive' }).click()
   await expect(card.getByRole('button', { name: 'Archive' })).toHaveCount(0)

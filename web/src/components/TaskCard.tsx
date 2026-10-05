@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { AlarmClock, Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { api, type TaskView, unwrap } from '@/lib/api'
+import type { TaskView } from '@/lib/api'
 import { celebrate } from '@/lib/celebrate'
 import { taskLabel } from '@/lib/labels'
+import { perform } from '@/lib/outbox'
 import { formatWhen } from '@/lib/time'
 import { useNow } from '@/lib/useNow'
 import { cn } from '@/lib/utils'
@@ -32,37 +33,43 @@ const snoozeOptions: SnoozeOption[] = [
 
 export function TaskCard({ task, showBatch = true }: { task: TaskView; showBatch?: boolean }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const now = useNow()
   const [snoozing, setSnoozing] = useState(false)
+  const label = `${taskLabel(task)} for ${task.plant_name}`
+  const harvest = task.kind === 'advance' && task.action === 'harvest'
 
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['tasks'] }),
       queryClient.invalidateQueries({ queryKey: ['batches'] }),
+      queryClient.invalidateQueries({ queryKey: ['stats'] }),
     ])
 
+  // Both go through the outbox, so they work offline and sync later.
   const complete = useMutation({
     mutationFn: () =>
-      unwrap(api.POST('/tasks/{id}/complete', { params: { path: { id: task.id } } })),
-    onSuccess: () => {
-      if (task.kind === 'advance' && task.action === 'harvest') celebrate()
+      perform({ kind: 'complete', taskId: task.id, doneAt: new Date().toISOString(), label }),
+    onSuccess: async (result) => {
+      if (!harvest) return
+      celebrate()
+      // Online, go straight to logging how the harvest went.
+      if (result === 'sent') {
+        await navigate({ to: '/batches/$id', params: { id: task.batch_id }, hash: 'harvest-log' })
+      }
     },
     onSettled: refresh,
   })
 
   const snooze = useMutation({
     mutationFn: (until: Date) =>
-      unwrap(
-        api.POST('/tasks/{id}/snooze', {
-          params: { path: { id: task.id } },
-          body: { until: until.toISOString() },
-        }),
-      ),
+      perform({ kind: 'snooze', taskId: task.id, until: until.toISOString(), label }),
     onSuccess: () => setSnoozing(false),
     onSettled: refresh,
   })
 
-  const snoozed = task.snoozed_until != null && new Date(task.snoozed_until) > now
+  const snoozedUntil = task.snoozed_until
+  const snoozed = snoozedUntil != null && new Date(snoozedUntil) > now
   const overdue = !snoozed && task.overdue_at != null && new Date(task.overdue_at) <= now
   const due = new Date(task.due_at) <= now
 
@@ -108,7 +115,7 @@ export function TaskCard({ task, showBatch = true }: { task: TaskView; showBatch
               )}
             >
               {snoozed
-                ? `snoozed until ${formatWhen(task.snoozed_until!, now)}`
+                ? `snoozed until ${formatWhen(snoozedUntil!, now)}`
                 : overdue
                   ? `overdue since ${formatWhen(task.overdue_at!, now)}`
                   : due

@@ -253,6 +253,98 @@
         ]
       }
     },
+    "/batches/{id}/harvests": {
+      "post": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "Log what a harvested batch yielded. Log again for a second cut.",
+        "operationId": "log_harvest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogHarvest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Harvest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The batch isn't harvested yet (`batch_not_harvested`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/containers": {
       "get": {
         "tags": [
@@ -534,6 +626,54 @@
             }
           },
           "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/harvests/{id}": {
+      "delete": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "Delete a harvest logged by mistake.",
+        "operationId": "delete_harvest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -1020,6 +1160,43 @@
         ]
       }
     },
+    "/stats/plants": {
+      "get": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "Your results per plant: yield per gram of seed, ratings, and days to harvest.",
+        "operationId": "plant_stats",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlantStats"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/tasks": {
       "get": {
         "tags": [
@@ -1094,11 +1271,30 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "done_at",
+            "in": "query",
+            "description": "When it was done, for ticks made offline that sync later. Defaults to now. At most a week\nago, and not in the future.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
           }
         ],
         "responses": {
           "204": {
             "description": "Done"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -1120,6 +1316,16 @@
           },
           "409": {
             "description": "The task is already done (`task_done`), or its batch has moved on (`batch_not_active`, `stale_task`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`done_at` is in the future or more than a week ago",
             "content": {
               "application/json": {
                 "schema": {
@@ -1234,11 +1440,19 @@
           "plant",
           "steps",
           "upcoming",
-          "open_tasks"
+          "open_tasks",
+          "harvests"
         ],
         "properties": {
           "batch": {
             "$ref": "#/components/schemas/BatchSummary"
+          },
+          "harvests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Harvest"
+            },
+            "description": "Logged harvests, oldest first."
           },
           "notes": {
             "type": "string"
@@ -1535,6 +1749,45 @@
           }
         }
       },
+      "Harvest": {
+        "type": "object",
+        "required": [
+          "id",
+          "batch_id",
+          "harvested_at",
+          "yield_g",
+          "notes"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "harvested_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "rating": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "1 to 5."
+          },
+          "yield_g": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "HarvestWindow": {
         "type": "object",
         "required": [
@@ -1570,6 +1823,39 @@
             "$ref": "#/components/schemas/Source"
           }
         }
+      },
+      "LogHarvest": {
+        "type": "object",
+        "required": [
+          "yield_g"
+        ],
+        "properties": {
+          "harvested_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Defaults to now."
+          },
+          "notes": {
+            "type": "string"
+          },
+          "rating": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "1 to 5."
+          },
+          "yield_g": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Grams harvested."
+          }
+        },
+        "additionalProperties": false
       },
       "Occupant": {
         "type": "object",
@@ -1639,6 +1925,57 @@
           "sprout",
           "microgreen"
         ]
+      },
+      "PlantStats": {
+        "type": "object",
+        "description": "How one plant has done for a user, over harvested batches with at least one harvest logged.",
+        "required": [
+          "plant_slug",
+          "plant_name",
+          "batches",
+          "seed_g",
+          "yield_g",
+          "yield_ratio",
+          "average_days"
+        ],
+        "properties": {
+          "average_days": {
+            "type": "number",
+            "format": "double",
+            "description": "From the batch's start to its first harvest."
+          },
+          "average_rating": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Over harvests that have a rating."
+          },
+          "batches": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "plant_name": {
+            "type": "string"
+          },
+          "plant_slug": {
+            "type": "string"
+          },
+          "seed_g": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "yield_g": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "yield_ratio": {
+            "type": "number",
+            "format": "double",
+            "description": "Grams harvested per gram of seed."
+          }
+        }
       },
       "Problem": {
         "type": "object",

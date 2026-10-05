@@ -17,6 +17,8 @@ export type Problem = Schemas['Problem']
 export type ErrorBody = Schemas['ErrorBody']
 export type Container = Schemas['Container']
 export type QuietHours = Schemas['QuietHours']
+export type Harvest = Schemas['Harvest']
+export type PlantStats = Schemas['PlantStats']
 export type ContainerKind = Schemas['ContainerKind']
 
 export const api = createClient<paths>({ baseUrl: '/api/v1' })
@@ -41,7 +43,17 @@ type Result<T> = { data?: T; error?: unknown; response: Response }
 
 /** Returns the response data, or throws an ApiError. */
 export async function unwrap<T>(request: Promise<Result<T>>): Promise<T> {
-  const { data, error, response } = await request
+  let result: Result<T>
+  try {
+    result = await request
+  } catch {
+    throw new Error(
+      navigator.onLine
+        ? "Couldn't reach the server. Try again in a moment."
+        : "You're offline. This needs a connection.",
+    )
+  }
+  const { data, error, response } = result
   if (!response.ok) {
     throw new ApiError(response.status, error as ErrorBody | undefined)
   }
@@ -122,3 +134,8 @@ export async function logout(): Promise<void> {
 export function loginUrl(returnTo: string): string {
   return `/auth/login?return_to=${encodeURIComponent(returnTo)}`
 }
+
+export const plantStatsQuery = queryOptions({
+  queryKey: ['stats', 'plants'],
+  queryFn: () => unwrap(api.GET('/stats/plants')),
+})

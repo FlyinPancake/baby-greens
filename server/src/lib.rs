@@ -40,9 +40,17 @@ pub fn app(state: AppState, session_store: PostgresStore, config: &Config) -> Ro
         .with_always_save(true)
         .with_expiry(Expiry::OnInactivity(auth::SESSION_IDLE_TIMEOUT));
 
+    // Only the API and the login flow get sessions. Static files stay outside, so the service
+    // worker fetching assets during a login can't send back the old session cookie after the
+    // callback has set the new one.
     let mut app = Router::new()
         .nest("/api", api::router())
-        .nest("/auth", auth::router());
+        .nest("/auth", auth::router())
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_same_origin,
+        ))
+        .layer(sessions);
 
     // Unknown paths fall back to index.html so client-side routes survive a reload.
     if let Some(dist) = &config.web_dist {
@@ -50,11 +58,5 @@ pub fn app(state: AppState, session_store: PostgresStore, config: &Config) -> Ro
         app = app.fallback_service(spa);
     }
 
-    app.layer(middleware::from_fn_with_state(
-        state.clone(),
-        auth::require_same_origin,
-    ))
-    .layer(sessions)
-    .layer(TraceLayer::new_for_http())
-    .with_state(state)
+    app.layer(TraceLayer::new_for_http()).with_state(state)
 }

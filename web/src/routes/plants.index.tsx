@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
+import { PlantResultsLine } from '@/components/PlantResults'
 import { stepIcons } from '@/lib/icons'
 import { Highlight, PageHeading } from '@/components/PageHeading'
 import { Badge } from '@/components/ui/badge'
@@ -116,6 +117,7 @@ function PlantCard({ entry }: { entry: LibraryEntry }) {
             )
           })}
         </ol>
+        <PlantResultsLine slug={entry.slug} />
       </Link>
     </li>
   )

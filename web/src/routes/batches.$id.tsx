@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { ColorDot } from '@/components/ContainerColor'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { stepIcons } from '@/lib/icons'
+import { HarvestLog } from '@/components/HarvestLog'
 import { TaskCard } from '@/components/TaskCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ import { api, type BatchDetail, batchQuery, unwrap } from '@/lib/api'
 import { stepLabels, stepNames } from '@/lib/labels'
 import { formatRange, formatWhen, formatWindow, percentBetween } from '@/lib/time'
 import { useNow } from '@/lib/useNow'
+import { usePendingTasks } from '@/lib/useOutbox'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/batches/$id')({
@@ -46,6 +48,7 @@ const statusStyles = {
 } as const
 
 function Batch({ detail }: { detail: BatchDetail }) {
+  const openTasks = usePendingTasks(detail.open_tasks)
   const now = useNow()
   const { batch, plant } = detail
   const status = batch.status === 'active' ? stepLabels[batch.current_action] : batch.status
@@ -98,11 +101,13 @@ function Batch({ detail }: { detail: BatchDetail }) {
         )}
       </section>
 
-      {batch.status === 'active' && detail.open_tasks.length > 0 && (
+      {batch.status === 'harvested' && <HarvestLog detail={detail} />}
+
+      {batch.status === 'active' && openTasks.length > 0 && (
         <section className="flex flex-col gap-3">
           <h2 className="text-2xl">To do</h2>
           <ul className="flex flex-col gap-3">
-            {detail.open_tasks.map((task) => (
+            {openTasks.map((task) => (
               <TaskCard key={task.id} task={task} showBatch={false} />
             ))}
           </ul>

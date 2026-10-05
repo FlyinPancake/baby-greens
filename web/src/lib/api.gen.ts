@@ -58,6 +58,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/batches/{id}/harvests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log what a harvested batch yielded. Log again for a second cut. */
+        post: operations["log_harvest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/containers": {
         parameters: {
             query?: never;
@@ -92,6 +109,23 @@ export interface paths {
         head?: never;
         /** Rename, edit, archive, or restore a jar or tray. */
         patch: operations["update_container"];
+        trace?: never;
+    };
+    "/harvests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a harvest logged by mistake. */
+        delete: operations["delete_harvest"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/me": {
@@ -204,6 +238,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stats/plants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your results per plant: yield per gram of seed, ratings, and days to harvest. */
+        get: operations["plant_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -264,6 +315,8 @@ export interface components {
     schemas: {
         BatchDetail: {
             batch: components["schemas"]["BatchSummary"];
+            /** @description Logged harvests, oldest first. */
+            harvests: components["schemas"]["Harvest"][];
             notes: string;
             open_tasks: components["schemas"]["TaskView"][];
             /** @description The plant definition as it was when the batch started. */
@@ -359,6 +412,22 @@ export interface components {
             /** @description For `invalid`, what's wrong with each field. */
             problems?: components["schemas"]["Problem"][];
         };
+        Harvest: {
+            /** Format: uuid */
+            batch_id: string;
+            /** Format: date-time */
+            harvested_at: string;
+            /** Format: uuid */
+            id: string;
+            notes: string;
+            /**
+             * Format: int32
+             * @description 1 to 5.
+             */
+            rating?: number | null;
+            /** Format: int32 */
+            yield_g: number;
+        };
         HarvestWindow: {
             /** Format: date-time */
             earliest: string;
@@ -369,6 +438,24 @@ export interface components {
             plant: components["schemas"]["Plant"];
             slug: components["schemas"]["Slug"];
             source: components["schemas"]["Source"];
+        };
+        LogHarvest: {
+            /**
+             * Format: date-time
+             * @description Defaults to now.
+             */
+            harvested_at?: string | null;
+            notes?: string;
+            /**
+             * Format: int32
+             * @description 1 to 5.
+             */
+            rating?: number | null;
+            /**
+             * Format: int32
+             * @description Grams harvested.
+             */
+            yield_g: number;
         };
         /**
          * @description The active batch in a container. Another household member's batch shows who grows it, but
@@ -396,6 +483,32 @@ export interface components {
         };
         /** @enum {string} */
         PlantKind: "sprout" | "microgreen";
+        /** @description How one plant has done for a user, over harvested batches with at least one harvest logged. */
+        PlantStats: {
+            /**
+             * Format: double
+             * @description From the batch's start to its first harvest.
+             */
+            average_days: number;
+            /**
+             * Format: double
+             * @description Over harvests that have a rating.
+             */
+            average_rating?: number | null;
+            /** Format: int64 */
+            batches: number;
+            plant_name: string;
+            plant_slug: string;
+            /** Format: int64 */
+            seed_g: number;
+            /** Format: int64 */
+            yield_g: number;
+            /**
+             * Format: double
+             * @description Grams harvested per gram of seed.
+             */
+            yield_ratio: number;
+        };
         /** @description One thing wrong with a plant definition. `path` points at the field, like `steps[1].care[0]`. */
         Problem: {
             message: string;
@@ -720,6 +833,72 @@ export interface operations {
             };
         };
     };
+    log_harvest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogHarvest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Harvest"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description The batch isn't harvested yet (`batch_not_harvested`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_containers: {
         parameters: {
             query?: never;
@@ -934,6 +1113,42 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_harvest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1308,6 +1523,33 @@ export interface operations {
             };
         };
     };
+    plant_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlantStats"][];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_tasks: {
         parameters: {
             query?: {
@@ -1348,7 +1590,13 @@ export interface operations {
     };
     complete_task: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description When it was done, for ticks made offline that sync later. Defaults to now. At most a week
+                 *     ago, and not in the future.
+                 */
+                done_at?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -1363,6 +1611,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
             };
             401: {
                 headers: {
@@ -1382,6 +1638,15 @@ export interface operations {
             };
             /** @description The task is already done (`task_done`), or its batch has moved on (`batch_not_active`, `stale_task`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description `done_at` is in the future or more than a week ago */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

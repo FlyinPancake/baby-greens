@@ -27,3 +27,6 @@ dist-ssr
 /e2e/.auth/
 /test-results/
 /playwright-report/
+
+# TanStack Router generator scratch space
+/.tanstack/
