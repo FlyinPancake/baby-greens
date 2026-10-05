@@ -114,5 +114,15 @@ description = "Run all formatting, lint, and type checks"
 depends = ["check:fmt", "check:clippy", "check:web", "check:api"]
 
 [tasks.test]
-description = "Run all tests"
+description = "Run the server tests"
 run = "cargo test --manifest-path server/Cargo.toml"
+
+[tasks."test:e2e"]
+description = "Run the browser tests. Needs `mise run up`; starts the dev servers if they're not running."
+dir = "web"
+run = "bunx playwright test"
+
+[tasks."test:e2e:install"]
+description = "Download the browser the end-to-end tests use"
+dir = "web"
+run = "bunx playwright install chromium"

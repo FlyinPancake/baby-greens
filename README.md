@@ -43,6 +43,12 @@ The API docs are at <http://localhost:5173/api/v1/docs>. After changing an API h
 
 `mise run serve` builds the frontend and serves it from the Rust server, the way production runs.
 
+Browser tests live in `web/e2e`. They sign in through Dex as `second@example.com` and check the main
+flows, plus that no page scrolls sideways at desktop, 375 px, and 320 px widths. Run
+`mise run test:e2e:install` once to download Chromium, then `mise run test:e2e` with Postgres and
+Dex up. The tests reuse `mise run dev` if it's running and start it if not. Batches they create are
+discarded, so they stay in that user's history.
+
 Run `mise tasks` to list the other tasks, such as `check`, `test`, `migrate:add`, and `db:reset`.
 
 ## Dev login
