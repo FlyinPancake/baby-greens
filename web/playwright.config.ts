@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// End-to-end tests against the dev stack. Start Postgres and Dex with `mise run up` first. The
-// API and Vite dev servers start on their own, or get reused if `mise run dev` is running.
+// End-to-end tests against a production build on :3100, served by the Rust server like in
+// production. Start Postgres and Dex with `mise run up` first. The Vite dev server isn't
+// involved, so hot reloads from editing files can't interrupt a test run.
 
 const signedIn = { storageState: 'e2e/.auth/user.json' }
 
@@ -9,10 +10,13 @@ export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // One retry everywhere. Chromium aborts requests with ERR_NETWORK_CHANGED whenever the OS
+  // reports a network change (Wi-Fi, Docker bridges, Tailscale), which has nothing to do with
+  // the app. Tests that only pass on retry show up as "flaky" in the summary.
+  retries: 1,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3100',
     trace: 'retain-on-failure',
   },
   projects: [
@@ -54,10 +58,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'mise run dev',
+    command: 'mise run test:e2e:server',
     cwd: '..',
-    url: 'http://localhost:5173/api/health',
-    reuseExistingServer: true,
-    timeout: 180_000,
+    url: 'http://localhost:3100/api/health',
+    // Always a fresh build, so a leftover server can't test stale code.
+    reuseExistingServer: false,
+    timeout: 300_000,
   },
 })

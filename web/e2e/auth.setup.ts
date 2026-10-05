@@ -1,4 +1,5 @@
 import { expect, test as setup } from '@playwright/test'
+import { sweepTestPlants } from './fixtures'
 
 // Tests run as Dex's second user, so they never touch the data of `grower@example.com`.
 setup('sign in through Dex', async ({ page }) => {
@@ -9,4 +10,5 @@ setup('sign in through Dex', async ({ page }) => {
   await page.click('#submit-login')
   await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening)|Up late/ })).toBeVisible()
   await page.context().storageState({ path: 'e2e/.auth/user.json' })
+  await sweepTestPlants(page)
 })

@@ -18,6 +18,8 @@ staticClients:
     secret: dev-client-secret
     redirectURIs:
       - {{ getenv "PUBLIC_URL" "http://localhost:5173" }}/auth/callback
+      # The production build the browser tests run against (`mise run test:e2e:server`).
+      - http://localhost:3100/auth/callback
 
 enablePasswordDB: true
 

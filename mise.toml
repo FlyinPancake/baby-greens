@@ -126,9 +126,20 @@ description = "Run the server tests"
 run = "cargo test --manifest-path server/Cargo.toml"
 
 [tasks."test:e2e"]
-description = "Run the browser tests. Needs `mise run up`; starts the dev servers if they're not running."
+description = "Run the browser tests against a production build. Needs `mise run up`."
 dir = "web"
 run = "bunx playwright test"
+
+[tasks."test:e2e:server"]
+description = "Serve a production build on :3100 for the browser tests, with push off"
+depends = ["build:web"]
+env = { WEB_DIST = "web/dist", BIND_ADDR = "127.0.0.1:3100", PUBLIC_URL = "http://localhost:3100", VAPID_PRIVATE_KEY = "", RUST_LOG = "warn" }
+# Start the binary itself. `cargo` is a mise shim, and the shim would load .env again over the
+# values above.
+run = [
+  "cargo build -q --manifest-path server/Cargo.toml",
+  "server/target/debug/baby-greens-server",
+]
 
 [tasks."test:e2e:install"]
 description = "Download the browser the end-to-end tests use"

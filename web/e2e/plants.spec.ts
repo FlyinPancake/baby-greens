@@ -3,15 +3,15 @@ import { deleteTestPlant, saveTestPlant } from './fixtures'
 
 test('the editor shows server validation next to the field', async ({ page }, testInfo) => {
   await page.goto('/plants')
-  const slug = await saveTestPlant(page, testInfo.project.name)
-  await page.goto(`/plants/${slug}`)
+  const plant = await saveTestPlant(page, testInfo.project.name)
+  await page.goto(`/plants/${plant.slug}`)
   // Step 2 (sprout) runs 2 to 5 days. A 1 day maximum is shorter than its minimum.
   const sprout = page.getByRole('listitem').filter({ hasText: 'Chores during this step' }).nth(1)
   await sprout.getByRole('textbox').nth(1).fill('1d')
   await page.getByRole('button', { name: 'Save changes' }).first().click()
 
   await expect(sprout.getByText('must not be shorter than duration_min')).toBeVisible()
-  await deleteTestPlant(page, slug)
+  await deleteTestPlant(page, plant)
 })
 
 test('durations that are not durations are flagged while typing', async ({ page }) => {

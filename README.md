@@ -56,11 +56,12 @@ and push need HTTPS, which this plain HTTP setup doesn't give; that comes with m
 
 `mise run serve` builds the frontend and serves it from the Rust server, the way production runs.
 
-Browser tests live in `web/e2e`. They sign in through Dex as `second@example.com` and check the main
-flows, plus that no page scrolls sideways at desktop, 375 px, and 320 px widths. Run
-`mise run test:e2e:install` once to download Chromium, then `mise run test:e2e` with Postgres and
-Dex up. The tests reuse `mise run dev` if it's running and start it if not. Batches they create are
-discarded, so they stay in that user's history.
+Browser tests live in `web/e2e`. They build the frontend and run it from the Rust server on
+`localhost:3100` with push off, so editing files during a run can't interfere. They sign in through
+Dex as `second@example.com` and check the main flows, plus that no page scrolls sideways at desktop,
+375 px, and 320 px widths. Run `mise run test:e2e:install` once to download Chromium, then
+`mise run test:e2e` with Postgres and Dex up. Tests make their own plants and jars and clean up
+after themselves; discarded test batches stay in that user's history.
 
 Reminders need a VAPID key. Run `mise run vapid:key` and put the result in `.env` as
 `VAPID_PRIVATE_KEY`. Without one the server runs with push off. Headless Chromium has no push

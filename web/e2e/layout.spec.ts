@@ -1,7 +1,15 @@
 import { expect, type Page, test } from '@playwright/test'
 
-/** Elements that stick out past the right or left edge of the viewport. */
-async function overflowing(page: Page): Promise<string[]> {
+/** How far the page scrolls sideways. Zero means it fits the screen. */
+async function sidewaysScroll(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const root = document.documentElement
+    return root.scrollWidth - root.clientWidth
+  })
+}
+
+/** Elements whose box crosses a screen edge, to explain a failure. Clipped ones count too. */
+async function wideElements(page: Page): Promise<string> {
   return page.evaluate(() => {
     const width = document.documentElement.clientWidth
     return [...document.querySelectorAll('body *')]
@@ -11,7 +19,13 @@ async function overflowing(page: Page): Promise<string[]> {
       })
       .slice(0, 5)
       .map((element) => `<${element.tagName.toLowerCase()}> "${element.textContent?.slice(0, 30)}"`)
+      .join(', ')
   })
+}
+
+async function expectFits(page: Page) {
+  const scroll = await sidewaysScroll(page)
+  expect(scroll, scroll > 0 ? `scrolls sideways; wide: ${await wideElements(page)}` : '').toBe(0)
 }
 
 const pages = [
@@ -28,7 +42,7 @@ for (const { path, ready } of pages) {
   test(`${path} fits the screen without sideways scrolling`, async ({ page }) => {
     await page.goto(path)
     await expect(page.getByText(ready).first()).toBeVisible()
-    expect(await overflowing(page)).toEqual([])
+    await expectFits(page)
   })
 }
 
@@ -36,7 +50,7 @@ test('the batch form fits the screen with a plant picked', async ({ page }) => {
   await page.goto('/batches/new')
   await page.getByRole('radiogroup', { name: 'Plant' }).getByRole('radio', { name: /Sunflower microgreens/ }).click()
   await expect(page.getByText('Grow ticket')).toBeVisible()
-  expect(await overflowing(page)).toEqual([])
+  await expectFits(page)
 })
 
 test('a container page fits the screen', async ({ page }) => {
@@ -46,5 +60,5 @@ test('a container page fits the screen', async ({ page }) => {
   test.skip(containers.length === 0, 'no containers to open')
   await page.goto(`/containers/${containers[0].id}`)
   await expect(page.getByText('Your batches in it')).toBeVisible()
-  expect(await overflowing(page)).toEqual([])
+  await expectFits(page)
 })

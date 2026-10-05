@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { deleteTestPlant, saveTestPlant, testPlantName } from './fixtures'
+import { deleteTestPlant, saveTestPlant } from './fixtures'
 
 /**
  * Makes sure this project's test jar exists and isn't archived, and returns its name. Reusing one
@@ -49,13 +49,13 @@ test('start a batch, advance it, and discard it', async ({ page }, testInfo) => 
   page.on('dialog', (dialog) => dialog.accept())
 
   await page.goto('/batches/new')
-  await plantPicker(page).getByRole('radio', { name: new RegExp(testPlantName) }).click()
+  await plantPicker(page).getByRole('radio', { name: plant.name }).click()
   await page.getByRole('radio', { name: jar }).click()
   await expect(page.getByRole('spinbutton', { name: 'Seed in grams' })).toHaveValue('60')
   await page.getByRole('button', { name: /Start/ }).last().click()
 
   // The new batch page, soaking, with the drain task waiting.
-  await expect(page.getByRole('heading', { name: testPlantName })).toBeVisible()
+  await expect(page.getByRole('heading', { name: plant.name })).toBeVisible()
   await expect(page.getByText('You are here')).toBeVisible()
   await page.getByRole('button', { name: 'Mark "Drain the soak water" done' }).click()
 

@@ -4,11 +4,8 @@ import type { Page } from '@playwright/test'
 // built-in plants. So tests that care about a plant's steps use their own, with known steps,
 // and delete it afterwards. Batches keep a copy of their plant, so deleting it is safe.
 
-export const testPlantName = 'E2E test sprouts'
-
 /** Soak 8h to 12h, sprout 2d to 5d with a rinse every 12h, then harvest. 60 g of seed. */
 const definition = {
-  name: testPlantName,
   kind: 'sprout',
   seed_g: 60,
   steps: [
@@ -23,9 +20,19 @@ const definition = {
   ],
 }
 
-/** Saves this project's test plant and returns its slug. The page must be on the app. */
-export async function saveTestPlant(page: Page, project: string): Promise<string> {
-  const slug = `e2e-sprouts-${project}`
+let saved = 0
+
+export type TestPlant = { slug: string; name: string }
+
+/**
+ * Saves a test plant. Each call gets its own slug and name, so tests running in parallel never
+ * pick or delete each other's plant. The page must be on the app.
+ */
+export async function saveTestPlant(page: Page, project: string): Promise<TestPlant> {
+  saved += 1
+  const id = `${project}-${Date.now()}-${saved}`
+  const slug = `e2e-sprouts-${id}`
+  const name = `E2E sprouts ${id}`
   const status = await page.evaluate(
     ([slug, body]) =>
       fetch(`/api/v1/plants/${slug}`, {
@@ -33,12 +40,26 @@ export async function saveTestPlant(page: Page, project: string): Promise<string
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       }).then((response) => response.status),
-    [slug, definition] as const,
+    [slug, { ...definition, name }] as const,
   )
   if (status !== 200) throw new Error(`saving the test plant failed with ${status}`)
-  return slug
+  return { slug, name }
 }
 
-export async function deleteTestPlant(page: Page, slug: string): Promise<void> {
+export async function deleteTestPlant(page: Page, { slug }: TestPlant): Promise<void> {
   await page.evaluate((slug) => fetch(`/api/v1/plants/${slug}`, { method: 'DELETE' }), slug)
+}
+
+/** Deletes test plants that earlier runs left behind, for example when a test failed. */
+export async function sweepTestPlants(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const entries: { slug: string; source: string }[] = await fetch('/api/v1/plants').then(
+      (response) => response.json(),
+    )
+    for (const entry of entries) {
+      if (entry.slug.startsWith('e2e-') && entry.source === 'custom') {
+        await fetch(`/api/v1/plants/${entry.slug}`, { method: 'DELETE' })
+      }
+    }
+  })
 }
