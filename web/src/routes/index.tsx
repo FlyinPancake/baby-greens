@@ -14,6 +14,7 @@ import { taskLabel } from '@/lib/labels'
 import { endOfToday, formatWhen, formatWindow } from '@/lib/time'
 import { usePendingTasks } from '@/lib/useOutbox'
 import { useNow } from '@/lib/useNow'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/')({
   component: Today,
@@ -47,13 +48,15 @@ function Today() {
         <h1 className="text-4xl tracking-tight sm:text-5xl">
           {greeting(now)}, <Highlight>{me.data?.display_name}</Highlight>
         </h1>
-        <div className="grid grid-cols-3 gap-3">
+        {/* On phones the harvest window gets a row of its own, so "tomorrow" isn't split. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Stat label="To do today" value={tasks.isPending ? '…' : today.length} tone="bg-due" />
           <Stat label="Growing" value={batches.isPending ? '…' : (batches.data?.length ?? 0)} tone="bg-main" />
           <Stat
             label="Next harvest"
             value={nextHarvest ? formatWindow(nextHarvest.earliest, nextHarvest.latest, now) : 'None yet'}
             tone="bg-secondary-background"
+            className="col-span-2 sm:col-span-1"
           />
         </div>
       </section>
@@ -106,9 +109,19 @@ function Today() {
   )
 }
 
-function Stat({ label, value, tone }: { label: string; value: ReactNode; tone: string }) {
+function Stat({
+  label,
+  value,
+  tone,
+  className,
+}: {
+  label: string
+  value: ReactNode
+  tone: string
+  className?: string
+}) {
   return (
-    <div className={`rounded-base border-2 border-border p-3 shadow-shadow ${tone}`}>
+    <div className={cn('rounded-base border-2 border-border p-3 shadow-shadow', tone, className)}>
       <p className="text-[10px] font-heading tracking-wide uppercase sm:text-xs">{label}</p>
       <p className="mt-1 font-heading text-xl leading-tight break-words sm:text-3xl">{value}</p>
     </div>
