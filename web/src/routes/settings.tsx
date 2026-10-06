@@ -209,7 +209,7 @@ function Schedule({ me }: { me: Me }) {
               id="timezone"
               value={timezone}
               onChange={(event) => setTimezone(event.target.value)}
-              className="h-10 min-w-0 flex-1 rounded-base border-2 border-border bg-secondary-background px-3 text-sm"
+              className="h-10 min-w-0 flex-1 rounded-base border-2 border-border bg-secondary-background px-3 text-base md:text-sm"
             >
               {timezones(timezone).map((zone) => (
                 <option key={zone} value={zone}>
@@ -245,7 +245,7 @@ function Schedule({ me }: { me: Me }) {
                 value={start}
                 onChange={(event) => setStart(event.target.value)}
                 aria-label="Quiet hours start"
-                className="h-9 rounded-base border-2 border-border bg-secondary-background px-2"
+                className="h-9 rounded-base border-2 border-border bg-secondary-background px-2 text-base md:text-sm"
               />
               <span>to</span>
               <input
@@ -253,7 +253,7 @@ function Schedule({ me }: { me: Me }) {
                 value={end}
                 onChange={(event) => setEnd(event.target.value)}
                 aria-label="Quiet hours end"
-                className="h-9 rounded-base border-2 border-border bg-secondary-background px-2"
+                className="h-9 rounded-base border-2 border-border bg-secondary-background px-2 text-base md:text-sm"
               />
             </div>
           )}

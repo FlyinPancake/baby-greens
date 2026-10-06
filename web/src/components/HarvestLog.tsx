@@ -233,7 +233,7 @@ function HarvestForm({
           value={harvestedAt}
           max={latest}
           onChange={(event) => setHarvestedAt(event.target.value)}
-          className="h-9 rounded-base border-2 border-border bg-background px-2"
+          className="h-9 rounded-base border-2 border-border bg-background px-2 text-base md:text-sm"
         />
       </label>
 

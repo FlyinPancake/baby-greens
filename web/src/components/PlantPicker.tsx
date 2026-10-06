@@ -43,7 +43,7 @@ export function PlantPicker({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search plants"
             aria-label="Search plants"
-            className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-foreground/50"
+            className="h-10 w-full bg-transparent text-base outline-none md:text-sm placeholder:text-foreground/50"
           />
         </label>
         <Segmented

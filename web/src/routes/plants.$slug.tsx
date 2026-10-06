@@ -172,7 +172,7 @@ function PlantWorkbench({ slug, entry }: { slug: string; entry: LibraryEntry | u
               spellCheck={false}
               rows={26}
               aria-label="Plant definition JSON"
-              className="rounded-none border-0 font-mono text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="rounded-none border-0 font-mono focus-visible:ring-0 focus-visible:ring-offset-0"
             />
           </div>
         )}

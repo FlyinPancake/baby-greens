@@ -28,6 +28,29 @@ async function expectFits(page: Page) {
   expect(scroll, scroll > 0 ? `scrolls sideways; wide: ${await wideElements(page)}` : '').toBe(0)
 }
 
+/**
+ * Visible text-entry fields smaller than 16px. iOS Safari zooms the page in when one of those gets
+ * focus, and stays zoomed.
+ */
+async function smallFields(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const notTyped = ['checkbox', 'radio', 'color', 'range', 'hidden', 'button', 'submit', 'file']
+    return [...document.querySelectorAll<HTMLElement>('input, select, textarea')]
+      .filter((field) => !(field instanceof HTMLInputElement && notTyped.includes(field.type)))
+      .filter((field) => field.checkVisibility())
+      .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
+      .map((field) => {
+        const name = field.getAttribute('aria-label') ?? field.getAttribute('placeholder') ?? ''
+        return `<${field.tagName.toLowerCase()}> "${name}" ${getComputedStyle(field).fontSize}`
+      })
+  })
+}
+
+async function expectNoZoom(page: Page) {
+  test.skip((page.viewportSize()?.width ?? 0) >= 768, 'only phones zoom into small fields')
+  expect(await smallFields(page)).toEqual([])
+}
+
 const pages = [
   { path: '/', ready: 'Growing' },
   { path: '/plants', ready: 'Add your own plant' },
@@ -45,6 +68,21 @@ for (const { path, ready } of pages) {
     await expectFits(page)
   })
 }
+
+for (const { path, ready } of pages) {
+  test(`${path} has no fields small enough to zoom into`, async ({ page }) => {
+    await page.goto(path)
+    await expect(page.getByText(ready).first()).toBeVisible()
+    await expectNoZoom(page)
+  })
+}
+
+test('the JSON editor is big enough not to zoom into', async ({ page }) => {
+  await page.goto('/plants/pea-shoots')
+  await page.getByRole('radio', { name: 'JSON' }).click()
+  await expect(page.getByText('pea-shoots.json')).toBeVisible()
+  await expectNoZoom(page)
+})
 
 test('the batch form fits the screen with a plant picked', async ({ page }) => {
   await page.goto('/batches/new')
