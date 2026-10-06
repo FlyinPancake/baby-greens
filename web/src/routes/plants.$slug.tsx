@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { MobileActionBar } from '@/components/MobileActionBar'
 import { PlantEditor } from '@/components/PlantEditor'
+import { PlantLinks } from '@/components/PlantLinks'
 import { PlantResults } from '@/components/PlantResults'
 import { Segmented } from '@/components/Segmented'
 import { Badge } from '@/components/ui/badge'
@@ -268,6 +269,7 @@ function Preview({ plant }: { plant: Plant }) {
         })}
       </ol>
       {plant.seed_g && <p className="text-sm">{plant.seed_g} g of seed per {plant.kind === 'sprout' ? 'jar' : 'tray'}</p>}
+      <PlantLinks links={plant.links} />
     </div>
   )
 }

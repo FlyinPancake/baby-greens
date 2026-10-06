@@ -7,6 +7,8 @@ export type GrowAction = Exclude<StepAction, 'harvest'>
 
 export type CareDraft = { id: string; action: CareAction; every: string }
 
+export type LinkDraft = { id: string; label: string; url: string }
+
 export type StepDraft = {
   id: string
   action: GrowAction
@@ -23,12 +25,17 @@ export type PlantDraft = {
   seedG: string
   /** Every step before the final harvest step, which the editor always adds back. */
   steps: StepDraft[]
+  links: LinkDraft[]
 }
 
 const newId = () => crypto.randomUUID()
 
 export function newCare(action: CareAction = 'rinse'): CareDraft {
   return { id: newId(), action, every: '12h' }
+}
+
+export function newLink(): LinkDraft {
+  return { id: newId(), label: '', url: '' }
 }
 
 export function newStep(action: GrowAction = 'sprout'): StepDraft {
@@ -55,6 +62,7 @@ export function fromPlant(plant: Plant): PlantDraft {
           every: care.every,
         })),
       })),
+    links: (plant.links ?? []).map((link) => ({ id: newId(), ...link })),
   }
 }
 
@@ -80,6 +88,10 @@ export function toPlant(draft: PlantDraft): Plant {
       })),
       { action: 'harvest' as const },
     ],
+    links:
+      draft.links.length > 0
+        ? draft.links.map((link) => ({ label: link.label.trim(), url: link.url.trim() }))
+        : undefined,
   }
 }
 
@@ -95,6 +107,7 @@ export function draftForSlug(slug: string): PlantDraft {
       { ...newStep('soak'), min: '8h', max: '12h' },
       { ...newStep('sprout'), min: '3d', max: '5d', care: [newCare('rinse')] },
     ],
+    links: [],
   }
 }
 

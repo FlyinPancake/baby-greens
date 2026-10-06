@@ -15,7 +15,8 @@
 //!       "care": [{ "action": "rinse", "every": "12h" }]
 //!     },
 //!     { "action": "harvest" }
-//!   ]
+//!   ],
+//!   "links": [{ "label": "Seed shop", "url": "https://seeds.example/mung-beans" }]
 //! }
 //! ```
 
@@ -37,7 +38,23 @@ pub struct Plant {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed_g: Option<u32>,
     pub steps: Vec<Step>,
+    /// Where the seeds come from, like a supplier's product page.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub links: Vec<Link>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Link {
+    #[schema(example = "Seed shop")]
+    pub label: String,
+    /// An `http` or `https` URL.
+    #[schema(example = "https://seeds.example/mung-beans")]
+    pub url: String,
+}
+
+/// The most links one plant can have.
+const MAX_LINKS: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -188,6 +205,23 @@ impl Plant {
         }
         if self.seed_g == Some(0) {
             report("seed_g".into(), "must be more than zero");
+        }
+        if self.links.len() > MAX_LINKS {
+            report("links".into(), "can have at most 10 links");
+        }
+        for (index, link) in self.links.iter().enumerate() {
+            if link.label.trim().is_empty() {
+                report(format!("links[{index}].label"), "must not be empty");
+            }
+            // Only web links, so a link can't run script when it's opened.
+            let web = url::Url::parse(link.url.trim())
+                .is_ok_and(|url| matches!(url.scheme(), "http" | "https"));
+            if !web {
+                report(
+                    format!("links[{index}].url"),
+                    "must be a web address starting with http:// or https://",
+                );
+            }
         }
 
         let Some((last, growing)) = self.steps.split_last() else {
@@ -413,6 +447,33 @@ mod tests {
             [
                 "steps[0].care[1].action: appears more than once in this step",
                 "steps[1]: the harvest step can't have durations or care",
+            ]
+        );
+    }
+
+    #[test]
+    fn checks_links() {
+        let plant = Plant::from_json(&MUNG_BEAN.replace(
+            "\"steps\"",
+            r#""links": [{ "label": "Seed shop", "url": "https://seeds.example/mung" }], "steps""#,
+        ))
+        .unwrap();
+        assert_eq!(plant.links[0].label, "Seed shop");
+
+        let json = MUNG_BEAN.replace(
+            "\"steps\"",
+            r#""links": [
+                { "label": " ", "url": "http://seeds.example" },
+                { "label": "Script", "url": "javascript:alert(1)" },
+                { "label": "Relative", "url": "/plants" }
+            ], "steps""#,
+        );
+        assert_eq!(
+            problems(&json),
+            [
+                "links[0].label: must not be empty",
+                "links[1].url: must be a web address starting with http:// or https://",
+                "links[2].url: must be a web address starting with http:// or https://",
             ]
         );
     }

@@ -22,7 +22,9 @@ import type { CareAction } from '@/lib/api'
 import {
   type CareDraft,
   type GrowAction,
+  type LinkDraft,
   newCare,
+  newLink,
   newStep,
   type PlantDraft,
   type ProblemLookup,
@@ -55,6 +57,9 @@ export function PlantEditor({
   problemAt: ProblemLookup
 }) {
   const set = (patch: Partial<PlantDraft>) => onChange({ ...draft, ...patch })
+
+  const setLink = (id: string, patch: Partial<LinkDraft>) =>
+    set({ links: draft.links.map((link) => (link.id === id ? { ...link, ...patch } : link)) })
 
   const setStep = (id: string, patch: Partial<StepDraft>) =>
     set({ steps: draft.steps.map((step) => (step.id === id ? { ...step, ...patch } : step)) })
@@ -106,6 +111,57 @@ export function PlantEditor({
             />
           </Field>
         </div>
+      </Panel>
+
+      <Panel title="Links">
+        <p className="-mt-2 text-sm">
+          Where you get the seeds, like a supplier's product page. Batches of this plant show them.
+        </p>
+        {problemAt('links') && <FieldProblem>{problemAt('links')}</FieldProblem>}
+        <ul className="flex flex-col gap-3">
+          {draft.links.map((link, index) => (
+            <li key={link.id} className="flex items-start gap-2">
+              <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                <Field label="Label" problem={problemAt(`links[${index}].label`)}>
+                  <Input
+                    value={link.label}
+                    onChange={(event) => setLink(link.id, { label: event.target.value })}
+                    placeholder="Seed shop"
+                  />
+                </Field>
+                <Field label="Address" problem={problemAt(`links[${index}].url`)}>
+                  <Input
+                    type="url"
+                    inputMode="url"
+                    value={link.url}
+                    onChange={(event) => setLink(link.id, { url: event.target.value })}
+                    placeholder="https://"
+                  />
+                </Field>
+              </div>
+              <div className="pt-7">
+                <IconButton
+                  label="Remove link"
+                  onClick={() => set({ links: draft.links.filter((other) => other.id !== link.id) })}
+                >
+                  <X />
+                </IconButton>
+              </div>
+            </li>
+          ))}
+          {draft.links.length < 10 && (
+            <li>
+              <Button
+                type="button"
+                variant="neutral"
+                size="sm"
+                onClick={() => set({ links: [...draft.links, newLink()] })}
+              >
+                <Plus /> Add a link
+              </Button>
+            </li>
+          )}
+        </ul>
       </Panel>
 
       <Panel title="Steps">

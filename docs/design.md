@@ -228,6 +228,9 @@ showing "today". The `kind` and `status` columns are Postgres enums mapped to Ru
 
 - `kind` is `sprout` or `microgreen`. `name_lat`, `seed_g` (grams for one jar or tray), and a step's
   `note` are optional.
+- `links` is an optional list of up to 10 `{ "label", "url" }` pairs, like a supplier's product
+  page. URLs must be `http` or `https`, so a link can't run script. The batch page shows the
+  plant's current links.
 - Step actions are `soak`, `sprout`, `blackout`, `light`, and `harvest`. Care actions are `rinse`,
   `water`, and `mist`.
 - Durations use [humantime](https://docs.rs/humantime) syntax, like `30m`, `12h`, `4d`, or `1d 12h`,

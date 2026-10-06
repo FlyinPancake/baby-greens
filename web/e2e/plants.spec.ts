@@ -44,3 +44,30 @@ test('create a custom plant, then delete it', async ({ page }, testInfo) => {
   await expect(page).toHaveURL(/\/plants$/)
   await expect(page.getByText('Test cress')).toHaveCount(0)
 })
+
+test('supplier links are checked, saved, and shown', async ({ page }, testInfo) => {
+  await page.goto('/plants')
+  const plant = await saveTestPlant(page, testInfo.project.name)
+  await page.goto(`/plants/${plant.slug}`)
+
+  // The message next to the field. The error summary repeats it.
+  const notWeb = page.getByText('must be a web address starting with http:// or https://', {
+    exact: true,
+  })
+  await page.getByRole('button', { name: 'Add a link' }).click()
+  await page.getByPlaceholder('Seed shop').fill('Seed shop')
+  const address = page.getByPlaceholder('https://')
+  await address.fill('javascript:alert(1)')
+  await page.getByRole('button', { name: 'Save changes' }).first().click()
+  await expect(notWeb).toBeVisible()
+
+  await address.fill('https://seeds.example/mung')
+  await page.getByRole('button', { name: 'Save changes' }).first().click()
+  await expect(notWeb).toHaveCount(0)
+  await page.reload()
+  const link = page.getByRole('link', { name: 'Seed shop' }).first()
+  await expect(link).toHaveAttribute('href', 'https://seeds.example/mung')
+  await expect(link).toHaveAttribute('target', '_blank')
+
+  await deleteTestPlant(page, plant)
+})

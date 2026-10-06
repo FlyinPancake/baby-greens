@@ -1835,6 +1835,25 @@
           }
         }
       },
+      "Link": {
+        "type": "object",
+        "required": [
+          "label",
+          "url"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "example": "Seed shop"
+          },
+          "url": {
+            "type": "string",
+            "description": "An `http` or `https` URL.",
+            "example": "https://seeds.example/mung-beans"
+          }
+        },
+        "additionalProperties": false
+      },
       "LogHarvest": {
         "type": "object",
         "required": [
@@ -1905,6 +1924,13 @@
         "properties": {
           "kind": {
             "$ref": "#/components/schemas/PlantKind"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "description": "Where the seeds come from, like a supplier's product page."
           },
           "name": {
             "type": "string"

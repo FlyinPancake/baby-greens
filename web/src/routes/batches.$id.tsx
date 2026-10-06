@@ -6,11 +6,12 @@ import { ColorDot } from '@/components/ContainerColor'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { stepIcons } from '@/lib/icons'
 import { HarvestLog } from '@/components/HarvestLog'
+import { PlantLinks } from '@/components/PlantLinks'
 import { TaskCard } from '@/components/TaskCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { api, type BatchDetail, batchQuery, unwrap } from '@/lib/api'
+import { api, type BatchDetail, batchQuery, plantQuery, unwrap } from '@/lib/api'
 import { stepLabels, stepNames } from '@/lib/labels'
 import { formatRange, formatWhen, formatWindow, percentBetween } from '@/lib/time'
 import { useOtherGrower } from '@/lib/useGrower'
@@ -53,6 +54,10 @@ function Batch({ detail }: { detail: BatchDetail }) {
   const now = useNow()
   const { batch, plant } = detail
   const grower = useOtherGrower(batch)
+  // The plant's current links, so ones added after the batch started show too. The batch's own
+  // copy covers a plant that was deleted since.
+  const current = useQuery(plantQuery(batch.plant_slug))
+  const links = current.data?.plant.links ?? plant.links
   const status = batch.status === 'active' ? stepLabels[batch.current_action] : batch.status
   const progress = batch.harvest_window
     ? percentBetween(batch.started_at, batch.harvest_window.earliest, now)
@@ -93,6 +98,8 @@ function Batch({ detail }: { detail: BatchDetail }) {
                 : 'Stopped'}
           </Fact>
         </dl>
+
+        <PlantLinks links={links} />
 
         {batch.status === 'active' && (
           <Progress value={progress} aria-label="Progress to the earliest harvest" />

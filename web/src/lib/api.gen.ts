@@ -449,6 +449,15 @@ export interface components {
             slug: components["schemas"]["Slug"];
             source: components["schemas"]["Source"];
         };
+        Link: {
+            /** @example Seed shop */
+            label: string;
+            /**
+             * @description An `http` or `https` URL.
+             * @example https://seeds.example/mung-beans
+             */
+            url: string;
+        };
         LogHarvest: {
             /**
              * Format: date-time
@@ -481,6 +490,8 @@ export interface components {
         };
         Plant: {
             kind: components["schemas"]["PlantKind"];
+            /** @description Where the seeds come from, like a supplier's product page. */
+            links?: components["schemas"]["Link"][];
             name: string;
             name_lat?: string | null;
             /**
