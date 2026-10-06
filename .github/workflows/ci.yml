@@ -49,10 +49,16 @@ jobs:
   e2e:
     name: Browser tests
     runs-on: ubuntu-latest
+    env:
+      # Only bun is needed here. Without this, `mise run` would install the other tools, and
+      # sqlx-cli compiles from source.
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
     steps:
       - uses: actions/checkout@v7
       - run: cp .env.example .env
       - uses: jdx/mise-action@v5
+        with:
+          install_args: bun
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
