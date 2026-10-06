@@ -161,8 +161,12 @@ function PushStatus({ state }: { state: PushState }) {
 
 const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
+/**
+ * Every zone the browser knows, plus UTC, which Chromium leaves out even though new accounts start
+ * on it, plus the saved zone in case this browser doesn't list it.
+ */
 function timezones(current: string): string[] {
-  const all = Intl.supportedValuesOf('timeZone')
+  const all = ['UTC', ...Intl.supportedValuesOf('timeZone').filter((zone) => zone !== 'UTC')]
   return all.includes(current) ? all : [current, ...all]
 }
 
