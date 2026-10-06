@@ -1,36 +1,13 @@
-# baby-greens plan
+# baby-greens design
 
 baby-greens tracks sprout and microgreen batches at home. It tells you what each jar or tray needs
 today, sends a reminder when a task is due, and records how each batch turned out.
 
 It runs as an installable PWA on desktop and phones, backed by a self-hosted Rust server. Login goes
-through an existing OIDC provider.
+through an existing OIDC provider. Growing for sale, orders, and customers are out of scope.
 
-## Scope
-
-Home growing only. No selling, orders, or customer features.
-
-### MVP
-
-1. Plant library. Each plant is a JSON definition listing its steps (soak, sprout, blackout, light,
-   harvest), with a duration range and repeating care chores for each step. See "Plant definitions"
-   below. Built-in plants ship in the binary. Users can add custom plants or override built-in ones.
-2. Batches. Pick a plant, seed weight, container, and start time. The user advances the batch from
-   step to step, and the server generates reminders and chores for the current step.
-3. Today view. Due tasks across all batches, ticked off one at a time.
-4. Reminders. Web push when a task is due, with snoozing and quiet hours.
-5. Harvest log. Date, yield in grams, a 1 to 5 rating, and notes. Yield ratio (grams harvested per
-   gram of seed) per plant.
-
-### Later
-
-- Photos per batch, shown as a timeline.
-- Seed inventory that subtracts what each batch uses.
-- Problem notes and a checklist for common issues (root hairs vs. mold).
-- Succession planning ("start a radish tray every 4 days").
-- Shared households.
-- Home Assistant integration over MQTT.
-- Native mobile app using the same API.
+This document describes how the app works now. [roadmap.md](roadmap.md) lists what's done and what
+might come next.
 
 ## Stack
 
@@ -168,8 +145,8 @@ The server is a confidential OIDC client. The browser never sees an OIDC token.
 5. The callback redirects to the stored return path. On failure it redirects to
    `/?auth_error=<code>` with one of `provider`, `expired`, `state_mismatch`, `not_allowed`, or
    `failed`.
-6. `POST /auth/logout` deletes the session and returns 204. RP-initiated logout at the provider is
-   not built yet, because Dex doesn't support it. Add it when it matters for the real provider.
+6. `POST /auth/logout` deletes the session and returns 204. It doesn't sign the user out at the
+   provider (RP-initiated logout), because Dex doesn't support it.
 
 For CSRF protection, the server rejects any request other than GET whose `Origin` header doesn't
 match the app's origin.
@@ -187,17 +164,8 @@ When it's back online, it gets a 401, sends the user through login, and then rep
 `OIDC_ALLOWED_GROUP` is optional. If set, the callback rejects users whose `groups` claim doesn't
 contain it. Without it, anyone the provider authenticates gets an account.
 
-### Later clients
-
-- Native app. A public OIDC client with PKCE that sends `Authorization: Bearer <access token>`. The
-  server checks JWT access tokens against the provider's JWKS. If the provider issues opaque access
-  tokens, the server calls the userinfo endpoint instead and caches the result for a few minutes.
-- Home Assistant and scripts. Personal API tokens created in the app's settings. The database stores
-  only a hash of each token. Each token has a name and a last-used time, and the user can revoke it.
-
-One Axum extractor, `AuthUser`, accepts a session cookie, a bearer token, or an API token. Handlers
-only see the resolved user. Build the cookie path first, but put the extractor in place on day one
-so the other two paths only add code inside it.
+Handlers get the signed-in user from the `AuthUser` extractor, which reads the session cookie. API
+tokens and bearer tokens on the roadmap only add code inside it.
 
 ## Data model
 
@@ -205,7 +173,6 @@ so the other two paths only add code inside it.
 User           (id, oidc_issuer, oidc_subject, display_name, email?, timezone,
                 quiet_start?, quiet_end?, created_at)
 Session        (managed by tower-sessions)
-ApiToken       (id, user, name, token_hash, last_used_at?, created_at)   -- later
 PushSubscription (id, user, endpoint, p256dh, auth, user_agent, created_at)
 
 CustomPlant    (slug PK, definition jsonb, created_by?, created_at, updated_at)
@@ -300,9 +267,8 @@ server/
 `domain/` turns a plant and a step start time into tasks. It has no I/O, so unit tests cover it
 fully. It's where bugs are most likely.
 
-Domain code emits events such as "task became due" and "step changed". `notify/` listens to these
-through a `Notifier` trait. Web push is the first implementation. APNs or FCM for a native app, and
-MQTT for HA, become further implementations without changes to the scheduling code.
+The reminder job in `jobs/` sends through the `Notifier` trait in `notify/`, which delivers one
+message to one push subscription. Web push is the only implementation. Tests use a fake notifier.
 
 ## Deployment
 
@@ -330,20 +296,3 @@ provider and, for push delivery, the push services.
 
 For development and CI, a Dex container with static test users stands in for the real provider. The
 server only depends on standard OIDC, so the dev setup doesn't need to match production.
-
-## Milestones
-
-1. Workspace setup. Cargo crate, Vite app, compose file with Postgres and Dex, SQLx migrations,
-   config loading.
-2. OIDC login, sessions, the `AuthUser` extractor, the Origin check, and a `/api/me` endpoint. The
-   React app shows a login button and the signed-in user.
-3. The plant definition format, a built-in library of 15 plants, custom plant storage, and domain
-   scheduling logic with tests.
-4. Plant, batch, and task API with utoipa-axum under `/api/v1`, the generated TypeScript client, the
-   today view, batch pages, and a JSON editor for plants.
-5. PWA install, push subscription, the scheduler, snoozing, and quiet hours. See "Reminders".
-6. Offline support (saved Query cache, queued mutations, replay after re-login) and the harvest log
-   with yield stats.
-7. The container image, the production compose file with optional backups, CI that publishes to
-   GHCR, and the deploy guide for Authentik behind an existing reverse proxy.
-8. Later: API tokens, the MQTT bridge for HA, and bearer token support for a native app.

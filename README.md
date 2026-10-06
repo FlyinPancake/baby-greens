@@ -1,14 +1,46 @@
 # baby-greens
 
-A tracker for sprout and microgreen batches at home. See [docs/plan.md](docs/plan.md) for the design
-and milestones.
+<img src="web/public/logo.svg" alt="" width="96"> <!-- rumdl-disable-line no-inline-html -->
+
+A tracker for sprout and microgreen batches at home. It shows what each jar or tray needs today,
+sends a reminder when a task is due, and records how each batch turned out. It installs as a PWA on
+desktop and phones, talks to a self-hosted Rust server, and signs you in through your own OIDC
+provider.
+
+## Features
+
+- A plant library of 15 built-in plants. Each plant is a JSON definition of steps (soak, sprout,
+  blackout, light, harvest) with duration ranges and repeating chores. You can add your own plants
+  or override the built-in ones in the in-app editor.
+- Batches with a plant, seed weight, container, and start time. You move a batch from step to step,
+  and the server schedules the chores for the current step.
+- A today view of everything due across all batches.
+- Web push reminders, with snoozing and quiet hours.
+- A harvest log with yield in grams, a 1 to 5 rating, and notes, plus the yield ratio per plant.
+- Offline use. The app keeps the last data it loaded, queues changes, and sends them when you're
+  back online.
+
+Growing for sale, orders, and customers are out of scope.
+
+## Running it
+
+CI publishes the image to `ghcr.io/flyinpancake/baby-greens` from `main` and `v*` tags. The server
+needs Postgres 18, an OIDC provider, and a reverse proxy that serves it over HTTPS, since service
+workers and push only work over HTTPS. [docs/deploy.md](docs/deploy.md) walks through it with
+Authentik, including the optional nightly backups.
+
+## Status
+
+The MVP is done. [docs/roadmap.md](docs/roadmap.md) lists what might come next: API tokens, a Home
+Assistant bridge over MQTT, a native app, batch photos, and seed inventory.
+[docs/design.md](docs/design.md) describes how the app works.
 
 ## Layout
 
 - `server/` is the Axum API. It uses SQLx with Postgres and applies migrations from
   `server/migrations/` on startup.
-- `server/plants/builtin.json` is the built-in plant library. The plan's "Plant definitions" section
-  describes the format.
+- `server/plants/builtin.json` is the built-in plant library. The "Plant definitions" section of
+  [docs/design.md](docs/design.md) describes the format.
 - `web/` is the React PWA, built with Vite, TanStack Router, TanStack Query, and Tailwind.
 - `compose.yaml` runs Postgres 18 and Dex for development.
 - `Dockerfile` builds the production image, and `deploy/` holds the production compose file. See
@@ -18,7 +50,7 @@ and milestones.
 - `dev/dex.yaml.tpl` configures Dex as a stand-in OIDC provider. Dex fills in the issuer and
   redirect URI from the environment.
 
-## Setup
+## Development
 
 You need Rust, Docker, and [mise](https://mise.jdx.dev). mise installs bun, watchexec, and sqlx-cli
 at the versions in `mise.toml`, loads `.env`, and runs the project tasks.
@@ -56,7 +88,8 @@ address from `tailscale` and sets `PUBLIC_URL` and `OIDC_ISSUER_URL` to match.
 
 In this mode `localhost:5173` doesn't answer, and the browser tests, which use localhost, won't
 pass. Run `mise run up` to move Dex back to localhost before plain `mise run dev`. Service workers
-and push need HTTPS, which this plain HTTP setup doesn't give; that comes with milestone 5.
+and push need HTTPS, so installing the app and getting reminders on a phone needs an HTTPS
+deployment. This setup is plain HTTP.
 
 `mise run serve` builds the frontend and serves it from the Rust server, the way production runs.
 
