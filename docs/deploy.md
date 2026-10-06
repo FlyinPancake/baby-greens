@@ -145,12 +145,12 @@ upgrade if you might want to go back. To upgrade on your own schedule, set `BABY
 
 The `backup` service is off by default. Turn it on with `COMPOSE_PROFILES=backup` in `.env`, then
 run `docker compose up -d`. Leave it off if something else already backs up the host, for example
-snapshots of Docker's volumes. To turn it off again, clear `COMPOSE_PROFILES` and remove the container with
-`docker compose --profile backup rm -sf backup`.
+snapshots of Docker's volumes. To turn it off again, clear `COMPOSE_PROFILES` and remove the
+container with `docker compose --profile backup rm -sf backup`.
 
-The service writes `backups/baby_greens-<date>.dump` daily at `BACKUP_HOUR` in `TZ`, and
-deletes dumps older than `BACKUP_KEEP_DAYS`. They're `pg_dump` custom-format archives. Copy them off
-the machine with whatever you already use. A backup on the same disk doesn't survive that disk.
+The service writes `backups/baby_greens-<date>.dump` daily at `BACKUP_HOUR` in `TZ`, and deletes
+dumps older than `BACKUP_KEEP_DAYS`. They're `pg_dump` custom-format archives. Copy them off the
+machine with whatever you already use. A backup on the same disk doesn't survive that disk.
 
 To restore one, stop the app and replace the database:
 

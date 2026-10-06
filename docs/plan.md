@@ -130,12 +130,12 @@ outlives a working connection.
 Ticking a task, snoozing it, and logging a harvest go through an outbox (`web/src/lib/outbox.ts`),
 also in IndexedDB. Online with an empty queue, a change goes straight out. Otherwise it waits, and
 the screen applies it right away: ticked tasks disappear and snoozed ones move. The outbox sends in
-order when the browser comes online, when the app becomes visible, and every 30 seconds. It stops
-at the first change that has to wait:
+order when the browser comes online, when the app becomes visible, and every 30 seconds. It stops at
+the first change that has to wait:
 
 - A network error, 5xx, or 429 leaves the change queued for the next try.
-- A 401 leaves it queued and shows a banner asking the user to sign in again. The queue survives
-  the login redirect and goes out once the session is back.
+- A 401 leaves it queued and shows a banner asking the user to sign in again. The queue survives the
+  login redirect and goes out once the session is back.
 - Any other 4xx drops the change and tells the user why, for example a task someone else already
   finished.
 
@@ -175,9 +175,9 @@ For CSRF protection, the server rejects any request other than GET whose `Origin
 match the app's origin.
 
 Only `/api` and `/auth` sit behind the session layer. Sessions save on every request so the idle
-timeout counts from the last visit, and static files would otherwise re-send the session cookie
-too. When the service worker fetched assets during a login, one of those responses could land after
-the callback and put the old, signed-out session id back.
+timeout counts from the last visit, and static files would otherwise re-send the session cookie too.
+When the service worker fetched assets during a login, one of those responses could land after the
+callback and put the old, signed-out session id back.
 
 When a session expires while the PWA is offline, the app keeps showing cached data and queued ticks.
 When it's back online, it gets a 401, sends the user through login, and then replays the queue.
@@ -311,12 +311,12 @@ MQTT for HA, become further implementations without changes to the scheduling co
 - The `Dockerfile` builds one image with the server and the built frontend, on distroless
   `cc-debian13`. cargo-chef keeps the dependency build in its own layer. The image's health check
   runs `baby-greens-server healthcheck`, which calls `/api/health`, because the image has no curl.
-- `deploy/compose.yaml` runs the app and Postgres 18 with the data on a volume. The `backup`
-  Compose profile adds a service that writes a `pg_dump` archive daily and deletes old ones.
+- `deploy/compose.yaml` runs the app and Postgres 18 with the data on a volume. The `backup` Compose
+  profile adds a service that writes a `pg_dump` archive daily and deletes old ones.
 - An existing reverse proxy terminates HTTPS and forwards to the app. Service workers and push
   require HTTPS, and the OIDC redirect URI uses that HTTPS origin.
-- Authentik is the provider. It has to sign ID tokens with an RSA key, because the app only
-  accepts RS256.
+- Authentik is the provider. It has to sign ID tokens with an RSA key, because the app only accepts
+  RS256.
 - GitHub Actions runs the checks, the server tests, the SQLx metadata check, and the browser tests.
   On pushes to `main` and `v*` tags it publishes `ghcr.io/<owner>/<repo>` for `linux/amd64`.
 
@@ -344,6 +344,6 @@ server only depends on standard OIDC, so the dev setup doesn't need to match pro
 5. PWA install, push subscription, the scheduler, snoozing, and quiet hours. See "Reminders".
 6. Offline support (saved Query cache, queued mutations, replay after re-login) and the harvest log
    with yield stats.
-7. The container image, the production compose file with optional backups, CI that publishes to GHCR, and
-   the deploy guide for Authentik behind an existing reverse proxy.
+7. The container image, the production compose file with optional backups, CI that publishes to
+   GHCR, and the deploy guide for Authentik behind an existing reverse proxy.
 8. Later: API tokens, the MQTT bridge for HA, and bearer token support for a native app.
