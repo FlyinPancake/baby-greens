@@ -33,7 +33,7 @@ export function PlantResults({ slug }: { slug: string }) {
   const stats = usePlantStats(slug)
   return (
     <div className="flex flex-col gap-3 rounded-base border-2 border-border bg-secondary-background p-4 shadow-shadow">
-      <p className="text-xs font-heading tracking-widest uppercase">Your results</p>
+      <p className="text-xs font-heading tracking-widest uppercase">Results</p>
       {stats ? (
         <dl className="grid grid-cols-2 gap-3">
           <Fact label="Per gram of seed" value={`${stats.yield_ratio.toFixed(1)}×`} />
@@ -45,7 +45,7 @@ export function PlantResults({ slug }: { slug: string }) {
           <Fact label="Days to harvest" value={stats.average_days.toFixed(1)} />
         </dl>
       ) : (
-        <p className="text-sm">Log a harvest of this plant to see how it does for you.</p>
+        <p className="text-sm">Log a harvest of this plant to see how it does.</p>
       )}
     </div>
   )

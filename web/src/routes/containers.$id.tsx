@@ -71,7 +71,7 @@ function ContainerHistory({ container }: { container: Container }) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-2xl">Your batches in it</h2>
+        <h2 className="text-2xl">Batches in it</h2>
         <ErrorAlert error={batches.error} />
         {batches.isPending ? (
           <p className="font-heading">Loading...</p>

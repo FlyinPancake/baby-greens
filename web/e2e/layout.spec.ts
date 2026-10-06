@@ -59,6 +59,6 @@ test('a container page fits the screen', async ({ page }) => {
   const containers = await page.evaluate(() => fetch('/api/v1/containers').then((r) => r.json()))
   test.skip(containers.length === 0, 'no containers to open')
   await page.goto(`/containers/${containers[0].id}`)
-  await expect(page.getByText('Your batches in it')).toBeVisible()
+  await expect(page.getByText('Batches in it', { exact: true })).toBeVisible()
   await expectFits(page)
 })

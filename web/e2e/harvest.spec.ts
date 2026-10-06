@@ -32,7 +32,7 @@ test('harvesting leads to the harvest log, which feeds the plant results', async
   await expect(page.getByRole('button', { name: 'Log another cut' })).toBeVisible()
 
   await page.goto(`/plants/${plant.slug}`)
-  await expect(page.getByText('Your results')).toBeVisible()
+  await expect(page.getByText('Results', { exact: true })).toBeVisible()
   await expect(page.getByText('2.0×')).toBeVisible()
 
   await cleanUp(page, batchId, jar)
