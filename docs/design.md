@@ -127,7 +127,8 @@ Everything else, like starting a batch or editing a plant, needs a connection an
 The server never stores passwords. All interactive login goes through the OIDC provider (Pocket ID,
 Authelia, Authentik, or any provider with discovery). The server reads `OIDC_ISSUER_URL`,
 `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` from its config and finds the endpoints through
-discovery.
+discovery. When an ID token is signed with a key it doesn't have, it runs discovery again and
+retries once, so logins keep working after the provider rotates its signing keys.
 
 ### Web (backend for frontend)
 

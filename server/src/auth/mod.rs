@@ -14,14 +14,14 @@ use axum::{
 };
 use openidconnect::{
     AuthorizationCode, CsrfToken, Nonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope,
-    TokenResponse, core::CoreAuthenticationFlow, reqwest,
+    TokenResponse, core::CoreAuthenticationFlow,
 };
 use serde::{Deserialize, Serialize};
 use tower_sessions::{Expiry, Session, cookie::time::Duration};
 use url::Url;
 use uuid::Uuid;
 
-use self::oidc::OidcClient;
+use self::oidc::Provider;
 pub use self::origin::require_same_origin;
 use crate::{
     AppState,
@@ -39,8 +39,7 @@ pub const SESSION_IDLE_TIMEOUT: Duration = Duration::days(30);
 const PENDING_LOGIN_TIMEOUT: Duration = Duration::minutes(10);
 
 pub struct AuthState {
-    oidc: OidcClient,
-    http: reqwest::Client,
+    oidc: Provider,
     allowed_group: Option<String>,
     /// `PUBLIC_URL` as an origin, like `https://greens.example.ts.net`.
     public_origin: String,
@@ -52,12 +51,10 @@ impl AuthState {
             .join("auth/callback")
             .context("could not build the OIDC redirect URL")?;
 
-        let http = oidc::http_client()?;
-        let oidc = oidc::discover(config, RedirectUrl::from_url(redirect_url), &http).await?;
+        let oidc = Provider::discover(config, RedirectUrl::from_url(redirect_url)).await?;
 
         Ok(Self {
             oidc,
-            http,
             allowed_group: config.allowed_group.clone(),
             public_origin: public_url.origin().ascii_serialization(),
         })
@@ -120,8 +117,8 @@ async fn login(
     let auth = &state.auth;
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
-    let mut request = auth
-        .oidc
+    let client = auth.oidc.client();
+    let mut request = client
         .authorize_url(
             CoreAuthenticationFlow::AuthorizationCode,
             CsrfToken::new_random,
@@ -224,17 +221,19 @@ async fn finish_login(
 
     let token = auth
         .oidc
+        .client()
         .exchange_code(AuthorizationCode::new(code))
         .context("the provider has no token endpoint")?
         .set_pkce_verifier(PkceCodeVerifier::new(pending.pkce_verifier))
-        .request_async(&auth.http)
+        .request_async(auth.oidc.http())
         .await
         .context("could not exchange the code for tokens")?;
 
     let id_token = token.id_token().context("the provider sent no ID token")?;
-    let claims = id_token
-        .claims(&auth.oidc.id_token_verifier(), &Nonce::new(pending.nonce))
-        .context("the ID token didn't verify")?;
+    let claims = auth
+        .oidc
+        .verify(id_token, &Nonce::new(pending.nonce))
+        .await?;
 
     if let Some(group) = &auth.allowed_group
         && !claims.additional_claims().groups.contains(group)
