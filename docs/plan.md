@@ -306,15 +306,27 @@ MQTT for HA, become further implementations without changes to the scheduling co
 
 ## Deployment
 
-`compose.yaml` runs the server and Postgres, with the database on a volume. A nightly `pg_dump`
-handles backups. The server only needs outbound internet access for push delivery.
+[docs/deploy.md](deploy.md) is the step-by-step guide. In short:
+
+- The `Dockerfile` builds one image with the server and the built frontend, on distroless
+  `cc-debian13`. cargo-chef keeps the dependency build in its own layer. The image's health check
+  runs `baby-greens-server healthcheck`, which calls `/api/health`, because the image has no curl.
+- `deploy/compose.yaml` runs the app and Postgres 18 with the data on a volume. The `backup`
+  Compose profile adds a service that writes a `pg_dump` archive daily and deletes old ones.
+- An existing reverse proxy terminates HTTPS and forwards to the app. Service workers and push
+  require HTTPS, and the OIDC redirect URI uses that HTTPS origin.
+- Authentik is the provider. It has to sign ID tokens with an RSA key, because the app only
+  accepts RS256.
+- GitHub Actions runs the checks, the server tests, the SQLx metadata check, and the browser tests.
+  On pushes to `main` and `v*` tags it publishes `ghcr.io/<owner>/<repo>` for `linux/amd64`.
 
 CI builds use SQLx offline mode. `cargo sqlx prepare` writes query metadata to `.sqlx/`, which is
 committed, so `cargo build` doesn't need a running database. Tests still run against a Postgres
 service container.
 
-Service workers and push require HTTPS, so the server sits behind `tailscale serve` or Caddy with a
-DNS-challenge certificate. The OIDC redirect URI must use that HTTPS origin.
+The server trusts the system certificate store on top of the bundled roots, so a provider behind a
+private CA works once `SSL_CERT_FILE` points at the CA. It only needs outbound access to the
+provider and, for push delivery, the push services.
 
 For development and CI, a Dex container with static test users stands in for the real provider. The
 server only depends on standard OIDC, so the dev setup doesn't need to match production.
@@ -332,5 +344,6 @@ server only depends on standard OIDC, so the dev setup doesn't need to match pro
 5. PWA install, push subscription, the scheduler, snoozing, and quiet hours. See "Reminders".
 6. Offline support (saved Query cache, queued mutations, replay after re-login) and the harvest log
    with yield stats.
-7. Deploy behind Tailscale or Caddy against the real provider.
+7. The container image, the production compose file with optional backups, CI that publishes to GHCR, and
+   the deploy guide for Authentik behind an existing reverse proxy.
 8. Later: API tokens, the MQTT bridge for HA, and bearer token support for a native app.

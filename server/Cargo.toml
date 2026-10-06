@@ -11,7 +11,9 @@ dotenvy = "0.15.7"
 humantime = "2.4.0"
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 openidconnect = "4"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+# Native roots on top of the bundled ones, so a provider behind a private CA works once the CA is in
+# the system store or SSL_CERT_FILE.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "uuid", "time", "json"] }

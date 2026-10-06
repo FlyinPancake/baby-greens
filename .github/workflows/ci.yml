@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Builds check queries against server/.sqlx instead of a database.
+  SQLX_OFFLINE: "true"
+
+jobs:
+  check:
+    name: Checks and server tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: baby_greens
+          POSTGRES_PASSWORD: baby_greens
+          POSTGRES_DB: baby_greens
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U baby_greens"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v7
+      # mise loads .env, and the example's DATABASE_URL matches the service above.
+      - run: cp .env.example .env
+      - uses: jdx/mise-action@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - run: mise run install
+      - run: mise run check
+      - run: mise run test
+      - run: mise run check:sqlx
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cp .env.example .env
+      - uses: jdx/mise-action@v5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - run: mise run install
+      - run: mise run up
+      - run: bunx playwright install --with-deps chromium
+        working-directory: web
+      # Build up front, so the test server starts well within Playwright's timeout.
+      - run: cargo build --manifest-path server/Cargo.toml
+      - run: mise run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-results
+          path: web/test-results
+          retention-days: 7
+
+  image:
+    name: Publish the image
+    needs: [check, e2e]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

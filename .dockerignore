@@ -1,0 +1,13 @@
+# Only the sources the image build needs.
+**/node_modules
+**/target
+**/.env
+**/.env.*
+web/dist
+web/test-results
+web/playwright-report
+web/e2e/.auth
+web/.tanstack
+.git
+docs
+dev

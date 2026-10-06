@@ -57,7 +57,8 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
+  // E2E_EXTERNAL_SERVER=1 tests a server that's already on :3100 instead, like the container image.
+  webServer: process.env.E2E_EXTERNAL_SERVER ? undefined : {
     command: 'mise run test:e2e:server',
     cwd: '..',
     url: 'http://localhost:3100/api/health',

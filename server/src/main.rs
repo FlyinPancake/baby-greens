@@ -1,4 +1,9 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    io::IsTerminal,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use baby_greens_server::{
@@ -14,6 +19,8 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> Result<()> {
     // `baby-greens-server openapi` prints the API spec and exits, without a database or config.
     // `baby-greens-server vapid-key` prints a new VAPID private key for VAPID_PRIVATE_KEY.
+    // `baby-greens-server healthcheck` asks a running server whether it's healthy, for container
+    // health checks in images without curl.
     match std::env::args().nth(1).as_deref() {
         Some("openapi") => {
             println!("{}", api::openapi().to_pretty_json()?);
@@ -23,6 +30,7 @@ async fn main() -> Result<()> {
             println!("{}", WebPush::generate_private_key());
             return Ok(());
         }
+        Some("healthcheck") => return healthcheck().await,
         _ => {}
     }
 
@@ -33,6 +41,8 @@ async fn main() -> Result<()> {
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("baby_greens_server=info,tower_http=info")),
         )
+        // Plain text when logs go to a file or a container runtime instead of a terminal.
+        .with_ansi(std::io::stdout().is_terminal())
         .init();
 
     let config = Config::from_env()?;
@@ -98,6 +108,34 @@ async fn main() -> Result<()> {
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
+    Ok(())
+}
+
+/// Calls `/api/health` on the server at BIND_ADDR and fails unless it answers 200.
+async fn healthcheck() -> Result<()> {
+    let mut addr: SocketAddr = std::env::var("BIND_ADDR")
+        .unwrap_or_else(|_| "127.0.0.1:3000".to_owned())
+        .parse()
+        .context("BIND_ADDR is not a valid socket address")?;
+    // A server listening on every interface also answers on loopback.
+    if addr.ip().is_unspecified() {
+        addr.set_ip(match addr {
+            SocketAddr::V4(_) => Ipv4Addr::LOCALHOST.into(),
+            SocketAddr::V6(_) => Ipv6Addr::LOCALHOST.into(),
+        });
+    }
+
+    let response = reqwest::Client::new()
+        .get(format!("http://{addr}/api/health"))
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await
+        .with_context(|| format!("could not reach the server at {addr}"))?;
+    anyhow::ensure!(
+        response.status().is_success(),
+        "the server is unhealthy: {}",
+        response.status()
+    );
     Ok(())
 }
 

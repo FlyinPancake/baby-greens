@@ -82,6 +82,16 @@ description = "Write query metadata to server/.sqlx so builds work without a dat
 dir = "server"
 run = "cargo sqlx prepare"
 
+[tasks."check:sqlx"]
+description = "Fail if server/.sqlx doesn't match the queries. Migrates the database at DATABASE_URL first."
+dir = "server"
+env = { SQLX_OFFLINE = "false" }
+run = ["sqlx migrate run", "cargo sqlx prepare --check"]
+
+[tasks."image:build"]
+description = "Build the production container image as baby-greens:local"
+run = "docker build -t baby-greens:local ."
+
 [tasks."api:gen"]
 description = "Write the OpenAPI spec to server/openapi.json and regenerate the TypeScript types"
 run = [

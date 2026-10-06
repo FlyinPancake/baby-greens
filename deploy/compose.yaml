@@ -1,0 +1,82 @@
+# Production stack: the app, Postgres, and optional nightly backups. Copy this file and
+# .env.example to the server, fill in .env, and run `docker compose up -d`. See docs/deploy.md.
+name: baby-greens
+
+services:
+  app:
+    image: ${BABY_GREENS_IMAGE:?set BABY_GREENS_IMAGE in .env}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://baby_greens:${POSTGRES_PASSWORD}@postgres:5432/baby_greens
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?set OIDC_ISSUER_URL in .env}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID in .env}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET in .env}
+      OIDC_ALLOWED_GROUP: ${OIDC_ALLOWED_GROUP:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      RUST_LOG: ${RUST_LOG:-baby_greens_server=info,tower_http=info}
+    # Where the reverse proxy reaches the app. Loopback by default, for a proxy on the same host.
+    ports:
+      - ${APP_BIND:-127.0.0.1:3000}:3000
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: baby_greens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: baby_greens
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "baby_greens"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Dumps the database once a day at BACKUP_HOUR into ./backups, and deletes dumps older than
+  # BACKUP_KEEP_DAYS. Restore with pg_restore, as described in docs/deploy.md. Off unless
+  # COMPOSE_PROFILES includes "backup".
+  backup:
+    profiles: [backup]
+    image: postgres:18-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: baby_greens
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: baby_greens
+      TZ: ${TZ:-UTC}
+      BACKUP_HOUR: ${BACKUP_HOUR:-03}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "backing up daily at $${BACKUP_HOUR}:00 $${TZ}, keeping $${BACKUP_KEEP_DAYS} days"
+        while true; do
+          file=/backups/baby_greens-$$(date +%F).dump
+          if [ "$$(date +%H)" = "$${BACKUP_HOUR}" ] && [ ! -f "$$file" ]; then
+            if pg_dump --format=custom --file="$$file.partial"; then
+              mv "$$file.partial" "$$file"
+              echo "wrote $$file"
+              find /backups -name 'baby_greens-*.dump' -mtime +"$${BACKUP_KEEP_DAYS}" -delete
+            else
+              rm -f "$$file.partial"
+              echo "backup failed, trying again in 10 minutes"
+            fi
+          fi
+          sleep 600
+        done
+
+volumes:
+  postgres-data:

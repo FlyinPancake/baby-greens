@@ -11,6 +11,10 @@ and milestones.
   describes the format.
 - `web/` is the React PWA, built with Vite, TanStack Router, TanStack Query, and Tailwind.
 - `compose.yaml` runs Postgres 18 and Dex for development.
+- `Dockerfile` builds the production image, and `deploy/` holds the production compose file. See
+  [docs/deploy.md](docs/deploy.md).
+- `.github/workflows/ci.yml` runs the checks, the server tests, and the browser tests, then
+  publishes the image to GHCR from `main`.
 - `dev/dex.yaml.tpl` configures Dex as a stand-in OIDC provider. Dex fills in the issuer and
   redirect URI from the environment.
 
@@ -67,6 +71,9 @@ Reminders need a VAPID key. Run `mise run vapid:key` and put the result in `.env
 `VAPID_PRIVATE_KEY`. Without one the server runs with push off. Headless Chromium has no push
 service, so the browser tests don't cover delivery; the Rust tests cover the job with a fake
 notifier.
+
+To run the browser tests against the container image instead, start it on `localhost:3100` and run
+them with `E2E_EXTERNAL_SERVER=1`. `mise run image:build` builds the image as `baby-greens:local`.
 
 Run `mise tasks` to list the other tasks, such as `check`, `test`, `migrate:add`, and `db:reset`.
 
