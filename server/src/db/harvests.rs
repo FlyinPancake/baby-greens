@@ -28,10 +28,9 @@ pub struct NewHarvest {
     pub notes: String,
 }
 
-/// Logs a harvest for one of the user's harvested batches.
+/// Logs a harvest for a harvested batch.
 pub async fn create(
     pool: &PgPool,
-    user_id: Uuid,
     batch_id: Uuid,
     harvest: NewHarvest,
     now: OffsetDateTime,
@@ -56,11 +55,10 @@ pub async fn create(
     let batch = sqlx::query!(
         r#"
         SELECT status AS "status: BatchStatus", started_at
-        FROM batches WHERE id = $1 AND user_id = $2
+        FROM batches WHERE id = $1
         FOR SHARE
         "#,
         batch_id,
-        user_id,
     )
     .fetch_optional(&mut *tx)
     .await?
@@ -109,26 +107,18 @@ pub async fn for_batch(pool: &PgPool, batch_id: Uuid) -> sqlx::Result<Vec<Harves
     .await
 }
 
-/// Deletes one of the user's harvests, for example one logged by mistake.
-pub async fn delete(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<(), AppError> {
-    let result = sqlx::query!(
-        r#"
-        DELETE FROM harvests h
-        USING batches b
-        WHERE h.id = $1 AND b.id = h.batch_id AND b.user_id = $2
-        "#,
-        id,
-        user_id,
-    )
-    .execute(pool)
-    .await?;
+/// Deletes a harvest, for example one logged by mistake.
+pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
+    let result = sqlx::query!("DELETE FROM harvests WHERE id = $1", id)
+        .execute(pool)
+        .await?;
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
 }
 
-/// How one plant has done for a user, over harvested batches with at least one harvest logged.
+/// How one plant has done across everyone's harvested batches with at least one harvest logged.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct PlantStats {
     pub plant_slug: String,
@@ -144,7 +134,7 @@ pub struct PlantStats {
     pub average_days: f64,
 }
 
-pub async fn plant_stats(pool: &PgPool, user_id: Uuid) -> sqlx::Result<Vec<PlantStats>> {
+pub async fn plant_stats(pool: &PgPool) -> sqlx::Result<Vec<PlantStats>> {
     sqlx::query_as!(
         PlantStats,
         r#"
@@ -153,7 +143,7 @@ pub async fn plant_stats(pool: &PgPool, user_id: Uuid) -> sqlx::Result<Vec<Plant
                    sum(h.yield_g) AS yield_g, avg(h.rating) AS rating, min(h.harvested_at) AS first_cut
             FROM batches b
             JOIN harvests h ON h.batch_id = b.id
-            WHERE b.user_id = $1 AND b.status = 'harvested'
+            WHERE b.status = 'harvested'
             GROUP BY b.id
         )
         SELECT plant_slug,
@@ -169,7 +159,6 @@ pub async fn plant_stats(pool: &PgPool, user_id: Uuid) -> sqlx::Result<Vec<Plant
         GROUP BY plant_slug
         ORDER BY plant_slug
         "#,
-        user_id,
     )
     .fetch_all(pool)
     .await
@@ -220,21 +209,17 @@ mod tests {
     }
 
     /// Completes tasks until the batch reaches harvest.
-    async fn harvest_batch(pool: &PgPool, user_id: Uuid, id: Uuid) {
+    async fn harvest_batch(pool: &PgPool, id: Uuid) {
         let mut at = START;
         loop {
-            let tasks = batches::open_tasks(pool, user_id, None, Some(id))
-                .await
-                .unwrap();
+            let tasks = batches::open_tasks(pool, None, Some(id)).await.unwrap();
             let Some(advance) = tasks.iter().find(|task| {
                 matches!(task.action, crate::domain::schedule::TaskAction::Advance(_))
             }) else {
                 break;
             };
             at = at.max(advance.due_at);
-            batches::complete_task(pool, user_id, advance.id, at)
-                .await
-                .unwrap();
+            batches::complete_task(pool, advance.id, at).await.unwrap();
         }
     }
 
@@ -252,23 +237,21 @@ mod tests {
         let user_id = user(&pool, "grower").await;
         let id = batch(&pool, user_id, "jar 1", "alfalfa", 15).await;
 
-        let early = create(&pool, user_id, id, cut(100, Some(4), NOW), NOW).await;
+        let early = create(&pool, id, cut(100, Some(4), NOW), NOW).await;
         assert!(matches!(
             early,
             Err(AppError::Conflict("batch_not_harvested"))
         ));
 
-        harvest_batch(&pool, user_id, id).await;
-        let logged = create(&pool, user_id, id, cut(120, Some(4), NOW), NOW)
+        harvest_batch(&pool, id).await;
+        let logged = create(&pool, id, cut(120, Some(4), NOW), NOW)
             .await
             .unwrap();
         assert_eq!(logged.yield_g, 120);
         assert_eq!(logged.notes, "crunchy");
 
         // A second cut is fine.
-        create(&pool, user_id, id, cut(40, None, NOW), NOW)
-            .await
-            .unwrap();
+        create(&pool, id, cut(40, None, NOW), NOW).await.unwrap();
         assert_eq!(for_batch(&pool, id).await.unwrap().len(), 2);
     }
 
@@ -276,7 +259,7 @@ mod tests {
     async fn harvest_values_are_checked(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
         let id = batch(&pool, user_id, "jar 1", "alfalfa", 15).await;
-        harvest_batch(&pool, user_id, id).await;
+        harvest_batch(&pool, id).await;
 
         for bad in [
             cut(-1, None, NOW),
@@ -287,32 +270,25 @@ mod tests {
             cut(10, None, START - time::Duration::hours(1)),
         ] {
             assert!(matches!(
-                create(&pool, user_id, id, bad, NOW).await,
+                create(&pool, id, bad, NOW).await,
                 Err(AppError::Invalid(_))
             ));
         }
     }
 
     #[sqlx::test]
-    async fn only_the_owner_logs_and_deletes(pool: PgPool) {
+    async fn deleting_a_harvest(pool: PgPool) {
         let owner = user(&pool, "grower").await;
-        let other = user(&pool, "neighbour").await;
         let id = batch(&pool, owner, "jar 1", "alfalfa", 15).await;
-        harvest_batch(&pool, owner, id).await;
+        harvest_batch(&pool, id).await;
 
-        assert!(matches!(
-            create(&pool, other, id, cut(10, None, NOW), NOW).await,
-            Err(AppError::NotFound)
-        ));
-        let logged = create(&pool, owner, id, cut(10, None, NOW), NOW)
-            .await
-            .unwrap();
-        assert!(matches!(
-            delete(&pool, other, logged.id).await,
-            Err(AppError::NotFound)
-        ));
-        delete(&pool, owner, logged.id).await.unwrap();
+        let logged = create(&pool, id, cut(10, None, NOW), NOW).await.unwrap();
+        delete(&pool, logged.id).await.unwrap();
         assert!(for_batch(&pool, id).await.unwrap().is_empty());
+        assert!(matches!(
+            delete(&pool, logged.id).await,
+            Err(AppError::NotFound)
+        ));
     }
 
     #[sqlx::test]
@@ -322,21 +298,21 @@ mod tests {
         let second = batch(&pool, user_id, "jar 2", "alfalfa", 20).await;
         let unlogged = batch(&pool, user_id, "jar 3", "alfalfa", 50).await;
         for id in [first, second, unlogged] {
-            harvest_batch(&pool, user_id, id).await;
+            harvest_batch(&pool, id).await;
         }
         // 4 days after the start, then 6 days after.
         let day = |days: i64| START + time::Duration::days(days);
-        create(&pool, user_id, first, cut(80, Some(4), day(4)), NOW)
+        create(&pool, first, cut(80, Some(4), day(4)), NOW)
             .await
             .unwrap();
-        create(&pool, user_id, first, cut(20, Some(2), day(5)), NOW)
+        create(&pool, first, cut(20, Some(2), day(5)), NOW)
             .await
             .unwrap();
-        create(&pool, user_id, second, cut(200, None, day(6)), NOW)
+        create(&pool, second, cut(200, None, day(6)), NOW)
             .await
             .unwrap();
 
-        let stats = plant_stats(&pool, user_id).await.unwrap();
+        let stats = plant_stats(&pool).await.unwrap();
         assert_eq!(stats.len(), 1);
         let alfalfa = &stats[0];
         assert_eq!(alfalfa.plant_slug, "alfalfa");
@@ -348,8 +324,5 @@ mod tests {
         // The first batch averages 3 over its two cuts. The second has no rating.
         assert_eq!(alfalfa.average_rating, Some(3.0));
         assert!((alfalfa.average_days - 5.0).abs() < 1e-9);
-
-        let other = user(&pool, "neighbour").await;
-        assert!(plant_stats(&pool, other).await.unwrap().is_empty());
     }
 }

@@ -1,5 +1,6 @@
 //! The reminder job. Every minute it finds tasks that came due, holds back people inside their
-//! quiet hours, and sends everyone else one notification covering their due tasks.
+//! quiet hours, and sends everyone else one notification covering the due tasks. Everyone gets
+//! reminders for every batch, since anyone on the server can tend it.
 
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
@@ -39,9 +40,9 @@ pub async fn run<N: Notifier>(pool: PgPool, notifier: Arc<N>) {
 /// What one run did.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Report {
-    /// Due tasks marked as notified.
+    /// Reminders marked as sent, one per task and person.
     pub tasks: usize,
-    /// Due tasks left for later because their owner is in quiet hours.
+    /// Reminders left for later because the person is in quiet hours.
     pub held: usize,
     /// Messages the push service accepted.
     pub sent: usize,
@@ -60,8 +61,8 @@ pub struct DueTask {
 
 /// Claims and sends the reminders due at `now`.
 ///
-/// Claiming happens in one transaction, which marks the tasks as notified before anything is
-/// sent. A failed send is not retried, so nobody gets the same reminder twice.
+/// Claiming happens in one transaction, which records who was notified about which task before
+/// anything is sent. A failed send is not retried, so nobody gets the same reminder twice.
 pub async fn send_due<N: Notifier>(
     pool: &PgPool,
     notifier: &N,
@@ -78,11 +79,13 @@ pub async fn send_due<N: Notifier>(
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
         JOIN containers c ON c.id = b.container_id
-        JOIN users u ON u.id = b.user_id
+        CROSS JOIN users u
         WHERE t.done_at IS NULL
-          AND t.notified_at IS NULL
           AND b.status = 'active'
           AND coalesce(t.snoozed_until, t.due_at) <= $1
+          AND NOT EXISTS (
+              SELECT 1 FROM task_notifications n WHERE n.task_id = t.id AND n.user_id = u.id
+          )
         ORDER BY coalesce(t.snoozed_until, t.due_at), t.id
         FOR UPDATE OF t SKIP LOCKED
         "#,
@@ -112,13 +115,20 @@ pub async fn send_due<N: Notifier>(
         });
     }
 
-    let ids: Vec<Uuid> = by_user.values().flatten().map(|task| task.id).collect();
-    report.tasks = ids.len();
-    if !ids.is_empty() {
+    let (task_ids, user_ids): (Vec<Uuid>, Vec<Uuid>) = by_user
+        .iter()
+        .flat_map(|(user_id, tasks)| tasks.iter().map(|task| (task.id, *user_id)))
+        .unzip();
+    report.tasks = task_ids.len();
+    if !task_ids.is_empty() {
         sqlx::query!(
-            "UPDATE tasks SET notified_at = $2 WHERE id = ANY($1)",
-            &ids,
-            now
+            r#"
+            INSERT INTO task_notifications (task_id, user_id, notified_at)
+            SELECT task_id, user_id, $3 FROM unnest($1::uuid[], $2::uuid[]) AS p (task_id, user_id)
+            "#,
+            &task_ids,
+            &user_ids,
+            now,
         )
         .execute(&mut *tx)
         .await?;
@@ -372,14 +382,12 @@ mod tests {
         let notifier = FakeNotifier::default();
         send_due(&pool, &notifier, DUE).await.unwrap();
 
-        let task = batches::open_tasks(&pool, user_id, None, Some(batch_id))
+        let task = batches::open_tasks(&pool, None, Some(batch_id))
             .await
             .unwrap()[0]
             .id;
         let until = DUE + time::Duration::hours(1);
-        batches::snooze_task(&pool, user_id, task, until, DUE)
-            .await
-            .unwrap();
+        batches::snooze_task(&pool, task, until, DUE).await.unwrap();
 
         let during = send_due(&pool, &notifier, until - time::Duration::minutes(1))
             .await
@@ -451,6 +459,72 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(later.tasks, 0);
+    }
+
+    /// Quiet from 17:00 to 19:00 in Budapest, which is 15:00 to 17:00 UTC.
+    async fn quiet_evening(pool: &PgPool, user_id: Uuid) {
+        let quiet = QuietHours {
+            start: time!(17:00),
+            end: time!(19:00),
+        };
+        users::update_settings(pool, user_id, Some("Europe/Budapest"), Some(Some(quiet)))
+            .await
+            .unwrap();
+    }
+
+    #[sqlx::test]
+    async fn everyone_gets_reminders_in_their_own_time(pool: PgPool) {
+        let owner = grower(&pool, "grower").await;
+        let neighbour = grower(&pool, "neighbour").await;
+        alfalfa(&pool, owner, "jar 1").await;
+        subscribe(&pool, owner, "https://push.example/owner").await;
+        subscribe(&pool, neighbour, "https://push.example/neighbour").await;
+        quiet_evening(&pool, neighbour).await;
+        let notifier = FakeNotifier::default();
+
+        let report = send_due(&pool, &notifier, DUE).await.unwrap();
+        assert_eq!(
+            report,
+            Report {
+                tasks: 1,
+                held: 1,
+                sent: 1,
+                removed: 0
+            }
+        );
+        assert_eq!(notifier.sent()[0].0, "https://push.example/owner");
+
+        // The neighbour's quiet hours end. The owner already has this one.
+        let after = send_due(&pool, &notifier, datetime!(2026-10-05 17:00 UTC))
+            .await
+            .unwrap();
+        assert_eq!(after.tasks, 1);
+        let sent = notifier.sent();
+        assert_eq!(sent.len(), 2);
+        assert_eq!(sent[1].0, "https://push.example/neighbour");
+    }
+
+    #[sqlx::test]
+    async fn done_tasks_skip_people_still_in_quiet_hours(pool: PgPool) {
+        let owner = grower(&pool, "grower").await;
+        let neighbour = grower(&pool, "neighbour").await;
+        let batch_id = alfalfa(&pool, owner, "jar 1").await;
+        subscribe(&pool, neighbour, "https://push.example/neighbour").await;
+        quiet_evening(&pool, neighbour).await;
+        let notifier = FakeNotifier::default();
+        send_due(&pool, &notifier, DUE).await.unwrap();
+
+        let task = batches::open_tasks(&pool, None, Some(batch_id))
+            .await
+            .unwrap()[0]
+            .id;
+        batches::complete_task(&pool, task, DUE).await.unwrap();
+
+        let after = send_due(&pool, &notifier, datetime!(2026-10-05 17:00 UTC))
+            .await
+            .unwrap();
+        assert_eq!(after, Report::default());
+        assert!(notifier.sent().is_empty());
     }
 
     #[test]

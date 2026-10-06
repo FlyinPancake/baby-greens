@@ -1,15 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT current_step, status AS \"status: BatchStatus\"\n        FROM batches WHERE id = $1 AND user_id = $2\n        FOR UPDATE\n        ",
+  "query": "\n        SELECT status AS \"status: BatchStatus\", started_at\n        FROM batches WHERE id = $1\n        FOR SHARE\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "current_step",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 1,
         "name": "status: BatchStatus",
         "type_info": {
           "Custom": {
@@ -23,11 +18,15 @@
             }
           }
         }
+      },
+      {
+        "ordinal": 1,
+        "name": "started_at",
+        "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid"
       ]
     },
@@ -36,5 +35,5 @@
       false
     ]
   },
-  "hash": "005091651e45c0fc17ecbe835fe9cbb5ee864d361221b01f523cda8618ac152a"
+  "hash": "bf298daaff16242bcde0a9b6171e35ba6da122c26b2fcd04c90c78c19be5f323"
 }

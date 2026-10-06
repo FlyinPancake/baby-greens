@@ -33,7 +33,7 @@ struct ListQuery {
     container_id: Option<Uuid>,
 }
 
-/// List your batches, newest first.
+/// List everyone's batches, newest first.
 #[utoipa::path(
     get,
     path = "/batches",
@@ -47,14 +47,14 @@ struct ListQuery {
 )]
 async fn list_batches(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<BatchSummary>>, AppError> {
     let filter = BatchFilter {
         status: query.status,
         container_id: query.container_id,
     };
-    Ok(Json(batches::list(&state.pool, user.id, filter).await?))
+    Ok(Json(batches::list(&state.pool, filter).await?))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -142,7 +142,7 @@ async fn create_batch(
     )
     .await?;
 
-    let detail = batches::find(&state.pool, user.id, id).await?;
+    let detail = batches::find(&state.pool, id).await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
@@ -160,10 +160,10 @@ async fn create_batch(
 )]
 async fn get_batch(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<BatchDetail>, AppError> {
-    Ok(Json(batches::find(&state.pool, user.id, id).await?))
+    Ok(Json(batches::find(&state.pool, id).await?))
 }
 
 /// Stop an active batch early, for example because it molded.
@@ -182,9 +182,9 @@ async fn get_batch(
 )]
 async fn discard_batch(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
-    batches::discard(&state.pool, user.id, id, OffsetDateTime::now_utc()).await?;
+    batches::discard(&state.pool, id, OffsetDateTime::now_utc()).await?;
     Ok(StatusCode::NO_CONTENT)
 }

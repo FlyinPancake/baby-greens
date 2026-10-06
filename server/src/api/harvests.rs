@@ -53,7 +53,7 @@ struct LogHarvest {
 )]
 async fn log_harvest(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
     Json(request): Json<LogHarvest>,
 ) -> Result<(StatusCode, Json<Harvest>), AppError> {
@@ -64,7 +64,7 @@ async fn log_harvest(
         rating: request.rating,
         notes: request.notes,
     };
-    let harvest = harvests::create(&state.pool, user.id, id, harvest, now).await?;
+    let harvest = harvests::create(&state.pool, id, harvest, now).await?;
     Ok((StatusCode::CREATED, Json(harvest)))
 }
 
@@ -83,14 +83,15 @@ async fn log_harvest(
 )]
 async fn delete_harvest(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
-    harvests::delete(&state.pool, user.id, id).await?;
+    harvests::delete(&state.pool, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Your results per plant: yield per gram of seed, ratings, and days to harvest.
+/// Results per plant across everyone's batches: yield per gram of seed, ratings, and days to
+/// harvest.
 #[utoipa::path(
     get,
     path = "/stats/plants",
@@ -103,7 +104,7 @@ async fn delete_harvest(
 )]
 async fn plant_stats(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
 ) -> Result<Json<Vec<PlantStats>>, AppError> {
-    Ok(Json(harvests::plant_stats(&state.pool, user.id).await?))
+    Ok(Json(harvests::plant_stats(&state.pool).await?))
 }

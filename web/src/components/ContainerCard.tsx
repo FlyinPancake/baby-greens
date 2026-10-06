@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { api, type Container, type ContainerKind, unwrap } from '@/lib/api'
 import { containerKindOptions } from '@/lib/icons'
+import { useOtherGrower } from '@/lib/useGrower'
 import { cn } from '@/lib/utils'
 import { ColorPicker, ContainerTile } from './ContainerColor'
 import { ErrorAlert } from './ErrorAlert'
@@ -126,6 +127,7 @@ export function ContainerCard({ container }: { container: Container }) {
 
 function Status({ container }: { container: Container }) {
   const { occupant } = container
+  const grower = useOtherGrower(occupant)
   if (container.archived_at) {
     return <p className="text-sm font-heading">Archived</p>
   }
@@ -139,15 +141,10 @@ function Status({ container }: { container: Container }) {
   return (
     <p className="w-fit max-w-full truncate rounded-base border-2 border-border bg-main px-2 py-0.5 text-sm font-heading">
       Growing{' '}
-      {occupant.batch_id ? (
-        <Link to="/batches/$id" params={{ id: occupant.batch_id }} className="underline">
-          {occupant.plant_name}
-        </Link>
-      ) : (
-        <>
-          {occupant.plant_name} for {occupant.grower}
-        </>
-      )}
+      <Link to="/batches/$id" params={{ id: occupant.batch_id }} className="underline">
+        {occupant.plant_name}
+      </Link>
+      {grower && <> for {grower}</>}
     </p>
   )
 }

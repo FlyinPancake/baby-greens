@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT t.done_at, b.status AS \"status: BatchStatus\"\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        WHERE t.id = $1 AND b.user_id = $2\n        FOR UPDATE OF t\n        ",
+  "query": "\n        SELECT t.done_at, b.status AS \"status: BatchStatus\"\n        FROM tasks t\n        JOIN batches b ON b.id = t.batch_id\n        WHERE t.id = $1\n        FOR UPDATE OF t\n        ",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,6 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid"
       ]
     },
@@ -36,5 +35,5 @@
       false
     ]
   },
-  "hash": "2de1c7b9385d91c8e51c3830d01cc7336cb9c91db8bcc1b203458408939cc084"
+  "hash": "6d3b6fc954908518beca95e473ee0dddeebe56aab8675b64241859b8b62dd1c5"
 }

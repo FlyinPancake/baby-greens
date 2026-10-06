@@ -13,6 +13,7 @@ import { Progress } from '@/components/ui/progress'
 import { api, type BatchDetail, batchQuery, unwrap } from '@/lib/api'
 import { stepLabels, stepNames } from '@/lib/labels'
 import { formatRange, formatWhen, formatWindow, percentBetween } from '@/lib/time'
+import { useOtherGrower } from '@/lib/useGrower'
 import { useNow } from '@/lib/useNow'
 import { usePendingTasks } from '@/lib/useOutbox'
 import { cn } from '@/lib/utils'
@@ -51,6 +52,7 @@ function Batch({ detail }: { detail: BatchDetail }) {
   const openTasks = usePendingTasks(detail.open_tasks)
   const now = useNow()
   const { batch, plant } = detail
+  const grower = useOtherGrower(batch)
   const status = batch.status === 'active' ? stepLabels[batch.current_action] : batch.status
   const progress = batch.harvest_window
     ? percentBetween(batch.started_at, batch.harvest_window.earliest, now)
@@ -63,6 +65,7 @@ function Batch({ detail }: { detail: BatchDetail }) {
           <div>
             <h1 className="text-4xl tracking-tight">{plant.name}</h1>
             {plant.name_lat && <p className="italic">{plant.name_lat}</p>}
+            {grower && <p>Started by {grower}</p>}
           </div>
           <Badge className={cn('rotate-3 px-3 py-1 text-sm font-heading capitalize shadow-shadow', statusStyles[batch.status])}>
             {status}

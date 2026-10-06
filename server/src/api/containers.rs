@@ -32,9 +32,9 @@ pub fn router() -> OpenApiRouter<AppState> {
 )]
 async fn list_containers(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
 ) -> Result<Json<Vec<Container>>, AppError> {
-    Ok(Json(containers::list(&state.pool, user.id).await?))
+    Ok(Json(containers::list(&state.pool).await?))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -77,7 +77,7 @@ async fn create_container(
         &request.notes,
     )
     .await?;
-    let container = containers::find(&state.pool, user.id, id).await?;
+    let container = containers::find(&state.pool, id).await?;
     Ok((StatusCode::CREATED, Json(container)))
 }
 
@@ -95,10 +95,10 @@ async fn create_container(
 )]
 async fn get_container(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Container>, AppError> {
-    Ok(Json(containers::find(&state.pool, user.id, id).await?))
+    Ok(Json(containers::find(&state.pool, id).await?))
 }
 
 /// Fields to change. Leave a field out to keep it.
@@ -135,7 +135,7 @@ struct UpdateContainer {
 )]
 async fn update_container(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateContainer>,
 ) -> Result<Json<Container>, AppError> {
@@ -147,7 +147,7 @@ async fn update_container(
         archived: request.archived,
     };
     containers::update(&state.pool, id, changes, OffsetDateTime::now_utc()).await?;
-    Ok(Json(containers::find(&state.pool, user.id, id).await?))
+    Ok(Json(containers::find(&state.pool, id).await?))
 }
 
 /// Delete a jar or tray that has never held a batch. Archive one with history instead.

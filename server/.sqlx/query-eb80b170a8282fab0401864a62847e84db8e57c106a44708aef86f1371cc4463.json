@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT b.id, b.plant_slug, b.plant AS \"plant: Json<Plant>\", b.container_id,\n               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS \"status: BatchStatus\",\n               b.current_step, b.notes, s.started_at AS step_started_at\n        FROM batches b\n        JOIN containers c ON c.id = b.container_id\n        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step\n        WHERE b.user_id = $1\n          AND ($2::batch_status IS NULL OR b.status = $2)\n          AND ($3::uuid IS NULL OR b.container_id = $3)\n        ORDER BY b.started_at DESC\n        ",
+  "query": "\n        SELECT b.id, b.user_id AS grower_id, u.display_name AS grower, b.plant_slug,\n               b.plant AS \"plant: Json<Plant>\", b.container_id,\n               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS \"status: BatchStatus\",\n               b.current_step, b.notes, s.started_at AS step_started_at\n        FROM batches b\n        JOIN containers c ON c.id = b.container_id\n        JOIN users u ON u.id = b.user_id\n        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step\n        WHERE b.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -10,41 +10,51 @@
       },
       {
         "ordinal": 1,
+        "name": "grower_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "grower",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
         "name": "plant_slug",
         "type_info": "Text"
       },
       {
-        "ordinal": 2,
+        "ordinal": 4,
         "name": "plant: Json<Plant>",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 3,
+        "ordinal": 5,
         "name": "container_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 4,
+        "ordinal": 6,
         "name": "container",
         "type_info": "Text"
       },
       {
-        "ordinal": 5,
+        "ordinal": 7,
         "name": "container_color",
         "type_info": "Text"
       },
       {
-        "ordinal": 6,
+        "ordinal": 8,
         "name": "seed_g",
         "type_info": "Int4"
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "started_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "status: BatchStatus",
         "type_info": {
           "Custom": {
@@ -60,40 +70,29 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "current_step",
         "type_info": "Int4"
       },
       {
-        "ordinal": 10,
+        "ordinal": 12,
         "name": "notes",
         "type_info": "Text"
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "step_started_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        {
-          "Custom": {
-            "name": "batch_status",
-            "kind": {
-              "Enum": [
-                "active",
-                "harvested",
-                "discarded"
-              ]
-            }
-          }
-        },
         "Uuid"
       ]
     },
     "nullable": [
+      false,
+      false,
       false,
       false,
       false,
@@ -108,5 +107,5 @@
       false
     ]
   },
-  "hash": "61308c8b1658d7ec55f9f3580e301256fb3da26281e0a8df05218dbaf2a2c47c"
+  "hash": "eb80b170a8282fab0401864a62847e84db8e57c106a44708aef86f1371cc4463"
 }

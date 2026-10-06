@@ -32,14 +32,14 @@ pub struct Container {
     pub occupant: Option<Occupant>,
 }
 
-/// The active batch in a container. Another household member's batch shows who grows it, but
-/// not its id, because batches are private to their owner.
+/// The active batch in a container.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Occupant {
     pub plant_name: String,
+    /// Who started the batch.
+    pub grower_id: Uuid,
     pub grower: String,
-    /// Set when the batch is yours, so you can link to it.
-    pub batch_id: Option<Uuid>,
+    pub batch_id: Uuid,
 }
 
 const NAME_TAKEN: &str = "another jar or tray already has this name";
@@ -80,7 +80,7 @@ fn clean_name(name: &str) -> Result<String, AppError> {
 
 /// Every container, unarchived ones first, then by name. `viewer` decides which occupants link
 /// to their batch.
-pub async fn list(pool: &PgPool, viewer: Uuid) -> Result<Vec<Container>, AppError> {
+pub async fn list(pool: &PgPool) -> Result<Vec<Container>, AppError> {
     let rows = sqlx::query!(
         r#"
         SELECT c.id, c.name, c.kind AS "kind: ContainerKind", c.color, c.notes, c.archived_at,
@@ -106,17 +106,22 @@ pub async fn list(pool: &PgPool, viewer: Uuid) -> Result<Vec<Container>, AppErro
             notes: row.notes,
             archived_at: row.archived_at,
             batch_count: row.batch_count,
-            occupant: row.active_plant.map(|plant_name| Occupant {
-                plant_name,
-                grower: row.active_grower.unwrap_or_default(),
-                batch_id: row.active_id.filter(|_| row.active_user == Some(viewer)),
-            }),
+            occupant: row
+                .active_id
+                .zip(row.active_user)
+                .zip(row.active_plant)
+                .map(|((batch_id, grower_id), plant_name)| Occupant {
+                    plant_name,
+                    grower_id,
+                    grower: row.active_grower.unwrap_or_default(),
+                    batch_id,
+                }),
         })
         .collect())
 }
 
-pub async fn find(pool: &PgPool, viewer: Uuid, id: Uuid) -> Result<Container, AppError> {
-    list(pool, viewer)
+pub async fn find(pool: &PgPool, id: Uuid) -> Result<Container, AppError> {
+    list(pool)
         .await?
         .into_iter()
         .find(|container| container.id == id)
@@ -317,7 +322,7 @@ mod tests {
             ..Default::default()
         };
         update(&pool, id, archive, NOW).await.unwrap();
-        let container = find(&pool, user_id, id).await.unwrap();
+        let container = find(&pool, id).await.unwrap();
         assert_eq!(container.archived_at, Some(NOW));
         assert_eq!(container.notes, "cracked corner");
 
@@ -326,13 +331,10 @@ mod tests {
             ..Default::default()
         };
         update(&pool, id, restore, NOW).await.unwrap();
-        assert_eq!(find(&pool, user_id, id).await.unwrap().archived_at, None);
+        assert_eq!(find(&pool, id).await.unwrap().archived_at, None);
 
         delete(&pool, id).await.unwrap();
-        assert!(matches!(
-            find(&pool, user_id, id).await,
-            Err(AppError::NotFound)
-        ));
+        assert!(matches!(find(&pool, id).await, Err(AppError::NotFound)));
     }
 
     #[sqlx::test]
@@ -349,7 +351,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            find(&pool, user_id, id).await.unwrap().color.as_deref(),
+            find(&pool, id).await.unwrap().color.as_deref(),
             Some("#3b82f6")
         );
 
@@ -364,7 +366,7 @@ mod tests {
         };
         update(&pool, id, recolor, NOW).await.unwrap();
         assert_eq!(
-            find(&pool, user_id, id).await.unwrap().color.as_deref(),
+            find(&pool, id).await.unwrap().color.as_deref(),
             Some("#ef4444")
         );
 
@@ -373,7 +375,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            find(&pool, user_id, id).await.unwrap().color.as_deref(),
+            find(&pool, id).await.unwrap().color.as_deref(),
             Some("#ef4444")
         );
         let clear = ContainerChanges {
@@ -381,6 +383,6 @@ mod tests {
             ..Default::default()
         };
         update(&pool, id, clear, NOW).await.unwrap();
-        assert_eq!(find(&pool, user_id, id).await.unwrap().color, None);
+        assert_eq!(find(&pool, id).await.unwrap().color, None);
     }
 }

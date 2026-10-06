@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE tasks SET snoozed_until = $2, notified_at = NULL WHERE id = $1",
+  "query": "UPDATE tasks SET snoozed_until = $2 WHERE id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "d9f4b723373726c7ef2e8b7eafd3bf525002ce96e05ee2bbb2ab7eb68525b254"
+  "hash": "87eb0a682ea3112bc44b470d849914f6a818ffe103a695bf858daf891ce35177"
 }

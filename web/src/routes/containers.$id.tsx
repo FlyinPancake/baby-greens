@@ -57,9 +57,6 @@ function ContainerHistory({ container }: { container: Container }) {
         <p>
           {container.batch_count} {container.batch_count === 1 ? 'batch' : 'batches'} in the
           household so far.
-          {container.occupant && !container.occupant.batch_id && (
-            <> {container.occupant.grower} is growing {container.occupant.plant_name} in it now.</>
-          )}
         </p>
         {free && (
           <div>

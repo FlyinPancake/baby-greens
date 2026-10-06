@@ -16,6 +16,7 @@ What's done and what might come next. [design.md](design.md) describes how the a
 5. Offline support with the saved Query cache and the outbox, and the harvest log with yield stats.
 6. The container image, the production compose file with optional backups, CI that publishes to
    GHCR, and the deploy guide.
+7. Shared batches. Everyone on the server sees and tends every batch and gets its reminders.
 
 ## Next: integrations
 
@@ -36,8 +37,8 @@ In no particular order:
 - Seed inventory that subtracts what each batch uses.
 - Problem notes and a checklist for common issues, such as root hairs vs. mold.
 - Succession planning, like "start a radish tray every 4 days".
-- Shared households. Custom plants and containers are already shared by every account on the server,
-  but batches belong to one user.
+- Separate households on one server. Today every account shares everything, so one server is one
+  household.
 
 ## Maintenance
 

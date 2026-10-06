@@ -5,11 +5,13 @@ import { Progress } from '@/components/ui/progress'
 import type { BatchSummary } from '@/lib/api'
 import { stepLabels } from '@/lib/labels'
 import { formatWhen, formatWindow, percentBetween } from '@/lib/time'
+import { useOtherGrower } from '@/lib/useGrower'
 import { useNow } from '@/lib/useNow'
 import { stepIcons } from '@/lib/icons'
 
 export function BatchCard({ batch }: { batch: BatchSummary }) {
   const now = useNow()
+  const grower = useOtherGrower(batch)
   const Icon = stepIcons[batch.current_action]
   const progress = batch.harvest_window
     ? percentBetween(batch.started_at, batch.harvest_window.earliest, now)
@@ -28,6 +30,7 @@ export function BatchCard({ batch }: { batch: BatchSummary }) {
             <p className="flex items-center gap-1.5 text-sm">
               {batch.container_color && <ColorDot color={batch.container_color} />}
               {batch.container}
+              {grower && <> · {grower}'s</>}
             </p>
           </div>
           <Badge className={batch.plant_kind === 'sprout' ? 'bg-due' : 'bg-chart-3 text-white'}>

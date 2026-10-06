@@ -8,6 +8,7 @@ import { celebrate } from '@/lib/celebrate'
 import { taskLabel } from '@/lib/labels'
 import { perform } from '@/lib/outbox'
 import { formatWhen } from '@/lib/time'
+import { useOtherGrower } from '@/lib/useGrower'
 import { useNow } from '@/lib/useNow'
 import { cn } from '@/lib/utils'
 import { ColorDot } from './ContainerColor'
@@ -35,6 +36,7 @@ export function TaskCard({ task, showBatch = true }: { task: TaskView; showBatch
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const now = useNow()
+  const grower = useOtherGrower(task)
   const [snoozing, setSnoozing] = useState(false)
   const label = `${taskLabel(task)} for ${task.plant_name}`
   const harvest = task.kind === 'advance' && task.action === 'harvest'
@@ -105,6 +107,7 @@ export function TaskCard({ task, showBatch = true }: { task: TaskView; showBatch
                   )}
                   {task.container}
                 </Link>
+                {grower && <>, {grower}'s</>}
                 {' · '}
               </>
             )}

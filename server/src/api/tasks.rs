@@ -28,7 +28,7 @@ struct SnoozeTask {
     until: OffsetDateTime,
 }
 
-/// Push a task back. You get a new reminder when the snooze ends.
+/// Push a task back. Everyone gets a new reminder when the snooze ends.
 #[utoipa::path(
     post,
     path = "/tasks/{id}/snooze",
@@ -47,12 +47,12 @@ struct SnoozeTask {
 )]
 async fn snooze_task(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
     Json(request): Json<SnoozeTask>,
 ) -> Result<StatusCode, AppError> {
     let now = OffsetDateTime::now_utc();
-    batches::snooze_task(&state.pool, user.id, id, request.until, now).await?;
+    batches::snooze_task(&state.pool, id, request.until, now).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -65,7 +65,7 @@ struct ListQuery {
     due_before: Option<OffsetDateTime>,
 }
 
-/// List open tasks on your active batches, soonest first.
+/// List open tasks on everyone's active batches, soonest first.
 #[utoipa::path(
     get,
     path = "/tasks",
@@ -80,10 +80,10 @@ struct ListQuery {
 )]
 async fn list_tasks(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Query(query): Query<ListQuery>,
 ) -> Result<Json<Vec<TaskView>>, AppError> {
-    let tasks = batches::open_tasks(&state.pool, user.id, query.due_before, None).await?;
+    let tasks = batches::open_tasks(&state.pool, query.due_before, None).await?;
     Ok(Json(tasks))
 }
 
@@ -120,7 +120,7 @@ struct CompleteQuery {
 )]
 async fn complete_task(
     State(state): State<AppState>,
-    AuthUser(user): AuthUser,
+    _user: AuthUser,
     Path(id): Path<Uuid>,
     Query(query): Query<CompleteQuery>,
 ) -> Result<StatusCode, AppError> {
@@ -136,6 +136,6 @@ async fn complete_task(
             "can't be more than a week ago",
         ));
     }
-    batches::complete_task(&state.pool, user.id, id, done_at).await?;
+    batches::complete_task(&state.pool, id, done_at).await?;
     Ok(StatusCode::NO_CONTENT)
 }

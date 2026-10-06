@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List your batches, newest first. */
+        /** List everyone's batches, newest first. */
         get: operations["list_batches"];
         put?: never;
         /**
@@ -245,7 +245,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your results per plant: yield per gram of seed, ratings, and days to harvest. */
+        /**
+         * Results per plant across everyone's batches: yield per gram of seed, ratings, and days to
+         *     harvest.
+         */
         get: operations["plant_stats"];
         put?: never;
         post?: never;
@@ -262,7 +265,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List open tasks on your active batches, soonest first. */
+        /** List open tasks on everyone's active batches, soonest first. */
         get: operations["list_tasks"];
         put?: never;
         post?: never;
@@ -301,7 +304,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Push a task back. You get a new reminder when the snooze ends. */
+        /** Push a task back. Everyone gets a new reminder when the snooze ends. */
         post: operations["snooze_task"];
         delete?: never;
         options?: never;
@@ -337,6 +340,13 @@ export interface components {
             container_id: string;
             current_action: components["schemas"]["StepAction"];
             current_step: number;
+            /** @description That user's display name. */
+            grower: string;
+            /**
+             * Format: uuid
+             * @description The user who started the batch. Everyone on the server can see and change it.
+             */
+            grower_id: string;
             harvest_window?: components["schemas"]["HarvestWindow"] | null;
             /** Format: uuid */
             id: string;
@@ -457,17 +467,16 @@ export interface components {
              */
             yield_g: number;
         };
-        /**
-         * @description The active batch in a container. Another household member's batch shows who grows it, but
-         *     not its id, because batches are private to their owner.
-         */
+        /** @description The active batch in a container. */
         Occupant: {
+            /** Format: uuid */
+            batch_id: string;
+            grower: string;
             /**
              * Format: uuid
-             * @description Set when the batch is yours, so you can link to it.
+             * @description Who started the batch.
              */
-            batch_id?: string | null;
-            grower: string;
+            grower_id: string;
             plant_name: string;
         };
         Plant: {
@@ -483,7 +492,7 @@ export interface components {
         };
         /** @enum {string} */
         PlantKind: "sprout" | "microgreen";
-        /** @description How one plant has done for a user, over harvested batches with at least one harvest logged. */
+        /** @description How one plant has done across everyone's harvested batches with at least one harvest logged. */
         PlantStats: {
             /**
              * Format: double
@@ -605,6 +614,12 @@ export interface components {
             container_color?: string | null;
             /** Format: date-time */
             due_at: string;
+            grower: string;
+            /**
+             * Format: uuid
+             * @description The user who started the batch.
+             */
+            grower_id: string;
             /** Format: uuid */
             id: string;
             /** Format: date-time */

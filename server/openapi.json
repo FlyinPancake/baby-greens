@@ -19,7 +19,7 @@
         "tags": [
           "batches"
         ],
-        "summary": "List your batches, newest first.",
+        "summary": "List everyone's batches, newest first.",
         "operationId": "list_batches",
         "parameters": [
           {
@@ -1165,7 +1165,7 @@
         "tags": [
           "batches"
         ],
-        "summary": "Your results per plant: yield per gram of seed, ratings, and days to harvest.",
+        "summary": "Results per plant across everyone's batches: yield per gram of seed, ratings, and days to\nharvest.",
         "operationId": "plant_stats",
         "responses": {
           "200": {
@@ -1202,7 +1202,7 @@
         "tags": [
           "tasks"
         ],
-        "summary": "List open tasks on your active batches, soonest first.",
+        "summary": "List open tasks on everyone's active batches, soonest first.",
         "operationId": "list_tasks",
         "parameters": [
           {
@@ -1347,7 +1347,7 @@
         "tags": [
           "tasks"
         ],
-        "summary": "Push a task back. You get a new reminder when the snooze ends.",
+        "summary": "Push a task back. Everyone gets a new reminder when the snooze ends.",
         "operationId": "snooze_task",
         "parameters": [
           {
@@ -1495,6 +1495,8 @@
         "type": "object",
         "required": [
           "id",
+          "grower_id",
+          "grower",
           "plant_slug",
           "plant_name",
           "plant_kind",
@@ -1529,6 +1531,15 @@
           "current_step": {
             "type": "integer",
             "minimum": 0
+          },
+          "grower": {
+            "type": "string",
+            "description": "That user's display name."
+          },
+          "grower_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The user who started the batch. Everyone on the server can see and change it."
           },
           "harvest_window": {
             "oneOf": [
@@ -1859,22 +1870,25 @@
       },
       "Occupant": {
         "type": "object",
-        "description": "The active batch in a container. Another household member's batch shows who grows it, but\nnot its id, because batches are private to their owner.",
+        "description": "The active batch in a container.",
         "required": [
           "plant_name",
-          "grower"
+          "grower_id",
+          "grower",
+          "batch_id"
         ],
         "properties": {
           "batch_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid",
-            "description": "Set when the batch is yours, so you can link to it."
+            "type": "string",
+            "format": "uuid"
           },
           "grower": {
             "type": "string"
+          },
+          "grower_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Who started the batch."
           },
           "plant_name": {
             "type": "string"
@@ -1928,7 +1942,7 @@
       },
       "PlantStats": {
         "type": "object",
-        "description": "How one plant has done for a user, over harvested batches with at least one harvest logged.",
+        "description": "How one plant has done across everyone's harvested batches with at least one harvest logged.",
         "required": [
           "plant_slug",
           "plant_name",
@@ -2242,6 +2256,8 @@
             "required": [
               "id",
               "batch_id",
+              "grower_id",
+              "grower",
               "step_index",
               "due_at",
               "container",
@@ -2264,6 +2280,14 @@
               "due_at": {
                 "type": "string",
                 "format": "date-time"
+              },
+              "grower": {
+                "type": "string"
+              },
+              "grower_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The user who started the batch."
               },
               "id": {
                 "type": "string",

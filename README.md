@@ -15,7 +15,9 @@ provider.
 - Batches with a plant, seed weight, container, and start time. You move a batch from step to step,
   and the server schedules the chores for the current step.
 - A today view of everything due across all batches.
-- Web push reminders, with snoozing and quiet hours.
+- Sharing. Everyone who can sign in sees and tends every batch, and the app shows who started each
+  one.
+- Web push reminders for everyone, with snoozing and quiet hours per person.
 - A harvest log with yield in grams, a 1 to 5 rating, and notes, plus the yield ratio per plant.
 - Offline use. The app keeps the last data it loaded, queues changes, and sends them when you're
   back online.
@@ -98,7 +100,7 @@ Browser tests live in `web/e2e`. They build the frontend and run it from the Rus
 Dex as `second@example.com` and check the main flows, plus that no page scrolls sideways at desktop,
 375 px, and 320 px widths. Run `mise run test:e2e:install` once to download Chromium, then
 `mise run test:e2e` with Postgres and Dex up. Tests make their own plants and jars and clean up
-after themselves; discarded test batches stay in that user's history.
+after themselves; discarded test batches stay in the history, where every account sees them.
 
 Reminders need a VAPID key. Run `mise run vapid:key` and put the result in `.env` as
 `VAPID_PRIVATE_KEY`. Without one the server runs with push off. Headless Chromium has no push

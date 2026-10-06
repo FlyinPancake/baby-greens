@@ -28,6 +28,10 @@ pub enum BatchStatus {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BatchSummary {
     pub id: Uuid,
+    /// The user who started the batch. Everyone on the server can see and change it.
+    pub grower_id: Uuid,
+    /// That user's display name.
+    pub grower: String,
     pub plant_slug: String,
     pub plant_name: String,
     pub plant_kind: PlantKind,
@@ -86,6 +90,9 @@ pub struct StepRecord {
 pub struct TaskView {
     pub id: Uuid,
     pub batch_id: Uuid,
+    /// The user who started the batch.
+    pub grower_id: Uuid,
+    pub grower: String,
     pub step_index: usize,
     #[serde(flatten)]
     pub action: TaskAction,
@@ -113,6 +120,8 @@ pub struct NewBatch {
 
 struct BatchRow {
     id: Uuid,
+    grower_id: Uuid,
+    grower: String,
     plant_slug: String,
     plant: Json<Plant>,
     container_id: Uuid,
@@ -146,6 +155,8 @@ impl BatchRow {
 
         Ok(BatchSummary {
             id: self.id,
+            grower_id: self.grower_id,
+            grower: self.grower.clone(),
             plant_slug: self.plant_slug.clone(),
             plant_name: plant.name.clone(),
             plant_kind: plant.kind,
@@ -171,33 +182,29 @@ fn db_index(value: usize) -> Result<i32, AppError> {
     i32::try_from(value).map_err(|_| anyhow!("step index {value} is too large").into())
 }
 
-/// Which of the user's batches to list. Empty filters list them all.
+/// Which batches to list. Empty filters list them all.
 #[derive(Debug, Default)]
 pub struct BatchFilter {
     pub status: Option<BatchStatus>,
     pub container_id: Option<Uuid>,
 }
 
-pub async fn list(
-    pool: &PgPool,
-    user_id: Uuid,
-    filter: BatchFilter,
-) -> Result<Vec<BatchSummary>, AppError> {
+pub async fn list(pool: &PgPool, filter: BatchFilter) -> Result<Vec<BatchSummary>, AppError> {
     let rows = sqlx::query_as!(
         BatchRow,
         r#"
-        SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container_id,
+        SELECT b.id, b.user_id AS grower_id, u.display_name AS grower, b.plant_slug,
+               b.plant AS "plant: Json<Plant>", b.container_id,
                c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
                b.current_step, b.notes, s.started_at AS step_started_at
         FROM batches b
         JOIN containers c ON c.id = b.container_id
+        JOIN users u ON u.id = b.user_id
         JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
-        WHERE b.user_id = $1
-          AND ($2::batch_status IS NULL OR b.status = $2)
-          AND ($3::uuid IS NULL OR b.container_id = $3)
+        WHERE ($1::batch_status IS NULL OR b.status = $1)
+          AND ($2::uuid IS NULL OR b.container_id = $2)
         ORDER BY b.started_at DESC
         "#,
-        user_id,
         filter.status as Option<BatchStatus>,
         filter.container_id,
     )
@@ -207,20 +214,21 @@ pub async fn list(
     rows.iter().map(BatchRow::summary).collect()
 }
 
-pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail, AppError> {
+pub async fn find(pool: &PgPool, id: Uuid) -> Result<BatchDetail, AppError> {
     let row = sqlx::query_as!(
         BatchRow,
         r#"
-        SELECT b.id, b.plant_slug, b.plant AS "plant: Json<Plant>", b.container_id,
+        SELECT b.id, b.user_id AS grower_id, u.display_name AS grower, b.plant_slug,
+               b.plant AS "plant: Json<Plant>", b.container_id,
                c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
                b.current_step, b.notes, s.started_at AS step_started_at
         FROM batches b
         JOIN containers c ON c.id = b.container_id
+        JOIN users u ON u.id = b.user_id
         JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
-        WHERE b.id = $1 AND b.user_id = $2
+        WHERE b.id = $1
         "#,
         id,
-        user_id,
     )
     .fetch_optional(pool)
     .await?
@@ -258,7 +266,7 @@ pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail,
         Vec::new()
     };
 
-    let open_tasks = open_tasks(pool, user_id, None, Some(id)).await?;
+    let open_tasks = open_tasks(pool, None, Some(id)).await?;
     let harvests = super::harvests::for_batch(pool, id).await?;
 
     Ok(BatchDetail {
@@ -272,11 +280,10 @@ pub async fn find(pool: &PgPool, user_id: Uuid, id: Uuid) -> Result<BatchDetail,
     })
 }
 
-/// Open tasks on the user's active batches, soonest first. `due_before` limits them by when
+/// Open tasks on active batches, soonest first. `due_before` limits them by when
 /// they're due, counting snoozes. `batch_id` limits them to one batch.
 pub async fn open_tasks(
     pool: &PgPool,
-    user_id: Uuid,
     due_before: Option<OffsetDateTime>,
     batch_id: Option<Uuid>,
 ) -> Result<Vec<TaskView>, AppError> {
@@ -285,18 +292,18 @@ pub async fn open_tasks(
         SELECT t.id, t.batch_id, t.step_index, t.kind::text AS "kind!", t.action,
                coalesce(t.snoozed_until, t.due_at) AS "due_at!", t.overdue_at, t.snoozed_until,
                c.name AS container, c.color AS container_color,
-               b.plant ->> 'name' AS "plant_name!"
+               b.plant ->> 'name' AS "plant_name!", b.user_id AS grower_id,
+               u.display_name AS grower
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
         JOIN containers c ON c.id = b.container_id
-        WHERE b.user_id = $1
-          AND b.status = 'active'
+        JOIN users u ON u.id = b.user_id
+        WHERE b.status = 'active'
           AND t.done_at IS NULL
-          AND ($2::timestamptz IS NULL OR coalesce(t.snoozed_until, t.due_at) <= $2)
-          AND ($3::uuid IS NULL OR t.batch_id = $3)
+          AND ($1::timestamptz IS NULL OR coalesce(t.snoozed_until, t.due_at) <= $1)
+          AND ($2::uuid IS NULL OR t.batch_id = $2)
         ORDER BY coalesce(t.snoozed_until, t.due_at), t.id
         "#,
-        user_id,
         due_before,
         batch_id,
     )
@@ -314,6 +321,8 @@ pub async fn open_tasks(
             Ok(TaskView {
                 id: row.id,
                 batch_id: row.batch_id,
+                grower_id: row.grower_id,
+                grower: row.grower,
                 step_index: index(row.step_index)?,
                 action,
                 due_at: row.due_at,
@@ -388,7 +397,6 @@ pub async fn create(pool: &PgPool, user_id: Uuid, batch: NewBatch) -> Result<Uui
 /// which can happen when an offline tick syncs late.
 pub async fn complete_task(
     pool: &PgPool,
-    user_id: Uuid,
     task_id: Uuid,
     done_at: OffsetDateTime,
 ) -> Result<(), AppError> {
@@ -402,11 +410,10 @@ pub async fn complete_task(
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
         JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
-        WHERE t.id = $1 AND b.user_id = $2
+        WHERE t.id = $1
         FOR UPDATE OF t, b
         "#,
         task_id,
-        user_id,
     )
     .fetch_optional(&mut *tx)
     .await?
@@ -445,11 +452,10 @@ pub async fn complete_task(
     Ok(())
 }
 
-/// Pushes a task back to `until`. It counts as not notified again, so a reminder goes out when
-/// the snooze ends.
+/// Pushes a task back to `until`. It counts as not notified again, so reminders go out when the
+/// snooze ends.
 pub async fn snooze_task(
     pool: &PgPool,
-    user_id: Uuid,
     task_id: Uuid,
     until: OffsetDateTime,
     now: OffsetDateTime,
@@ -467,11 +473,10 @@ pub async fn snooze_task(
         SELECT t.done_at, b.status AS "status: BatchStatus"
         FROM tasks t
         JOIN batches b ON b.id = t.batch_id
-        WHERE t.id = $1 AND b.user_id = $2
+        WHERE t.id = $1
         FOR UPDATE OF t
         "#,
         task_id,
-        user_id,
     )
     .fetch_optional(&mut *tx)
     .await?
@@ -485,33 +490,30 @@ pub async fn snooze_task(
     }
 
     sqlx::query!(
-        "UPDATE tasks SET snoozed_until = $2, notified_at = NULL WHERE id = $1",
+        "UPDATE tasks SET snoozed_until = $2 WHERE id = $1",
         task_id,
         until,
     )
     .execute(&mut *tx)
     .await?;
+    sqlx::query!("DELETE FROM task_notifications WHERE task_id = $1", task_id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok(())
 }
 
 /// Stops an active batch early.
-pub async fn discard(
-    pool: &PgPool,
-    user_id: Uuid,
-    id: Uuid,
-    now: OffsetDateTime,
-) -> Result<(), AppError> {
+pub async fn discard(pool: &PgPool, id: Uuid, now: OffsetDateTime) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
 
     let batch = sqlx::query!(
         r#"
         SELECT current_step, status AS "status: BatchStatus"
-        FROM batches WHERE id = $1 AND user_id = $2
+        FROM batches WHERE id = $1
         FOR UPDATE
         "#,
         id,
-        user_id,
     )
     .fetch_optional(&mut *tx)
     .await?
@@ -691,10 +693,8 @@ mod tests {
         create(pool, user_id, alfalfa(container_id)).await.unwrap()
     }
 
-    async fn tasks(pool: &PgPool, user_id: Uuid, batch_id: Uuid) -> Vec<TaskView> {
-        open_tasks(pool, user_id, None, Some(batch_id))
-            .await
-            .unwrap()
+    async fn tasks(pool: &PgPool, batch_id: Uuid) -> Vec<TaskView> {
+        open_tasks(pool, None, Some(batch_id)).await.unwrap()
     }
 
     #[sqlx::test]
@@ -703,7 +703,7 @@ mod tests {
         let id = alfalfa_batch(&pool, user_id).await;
 
         // Soaking: only the advance task, due after the shortest soak.
-        let soak = tasks(&pool, user_id, id).await;
+        let soak = tasks(&pool, id).await;
         assert_eq!(soak.len(), 1);
         assert_eq!(soak[0].action, TaskAction::Advance(StepAction::Sprout));
         assert_eq!(soak[0].due_at, datetime!(2026-10-05 16:00 UTC));
@@ -711,11 +711,9 @@ mod tests {
 
         // Drain late, at 18:00. The sprout step counts from then.
         let drained = datetime!(2026-10-05 18:00 UTC);
-        complete_task(&pool, user_id, soak[0].id, drained)
-            .await
-            .unwrap();
+        complete_task(&pool, soak[0].id, drained).await.unwrap();
 
-        let sprouting = tasks(&pool, user_id, id).await;
+        let sprouting = tasks(&pool, id).await;
         let actions: Vec<_> = sprouting
             .iter()
             .map(|task| (task.action, task.due_at))
@@ -734,7 +732,7 @@ mod tests {
             ]
         );
 
-        let detail = find(&pool, user_id, id).await.unwrap();
+        let detail = find(&pool, id).await.unwrap();
         assert_eq!(detail.batch.current_action, StepAction::Sprout);
         assert_eq!(detail.steps[0].ended_at, Some(drained));
         let window = detail.batch.harvest_window.unwrap();
@@ -743,24 +741,22 @@ mod tests {
 
         // Rinsing schedules the next rinse from when it was done.
         let rinsed = datetime!(2026-10-06 07:30 UTC);
-        complete_task(&pool, user_id, sprouting[0].id, rinsed)
-            .await
-            .unwrap();
-        let next_rinse = &tasks(&pool, user_id, id).await[0];
+        complete_task(&pool, sprouting[0].id, rinsed).await.unwrap();
+        let next_rinse = &tasks(&pool, id).await[0];
         assert_eq!(next_rinse.action, TaskAction::Care(CareAction::Rinse));
         assert_eq!(next_rinse.due_at, datetime!(2026-10-06 19:30 UTC));
 
         // Doing it twice is a conflict.
-        let again = complete_task(&pool, user_id, sprouting[0].id, rinsed).await;
+        let again = complete_task(&pool, sprouting[0].id, rinsed).await;
         assert!(matches!(again, Err(AppError::Conflict("task_done"))));
 
         // Harvesting ends the batch and drops the leftover rinse.
         let harvested = datetime!(2026-10-10 09:00 UTC);
-        complete_task(&pool, user_id, sprouting[1].id, harvested)
+        complete_task(&pool, sprouting[1].id, harvested)
             .await
             .unwrap();
 
-        let detail = find(&pool, user_id, id).await.unwrap();
+        let detail = find(&pool, id).await.unwrap();
         assert_eq!(detail.batch.status, BatchStatus::Harvested);
         assert_eq!(detail.batch.current_action, StepAction::Harvest);
         assert!(detail.batch.harvest_window.is_none());
@@ -775,61 +771,46 @@ mod tests {
         let user_id = user(&pool, "grower").await;
         alfalfa_batch(&pool, user_id).await;
 
-        let before_due = open_tasks(&pool, user_id, Some(datetime!(2026-10-05 15:59 UTC)), None);
+        let before_due = open_tasks(&pool, Some(datetime!(2026-10-05 15:59 UTC)), None);
         assert!(before_due.await.unwrap().is_empty());
 
-        let at_due = open_tasks(&pool, user_id, Some(datetime!(2026-10-05 16:00 UTC)), None);
+        let at_due = open_tasks(&pool, Some(datetime!(2026-10-05 16:00 UTC)), None);
         assert_eq!(at_due.await.unwrap().len(), 1);
     }
 
     #[sqlx::test]
-    async fn other_users_batches_are_invisible(pool: PgPool) {
+    async fn batches_show_who_started_them(pool: PgPool) {
         let owner = user(&pool, "grower").await;
-        let other = user(&pool, "neighbour").await;
         let id = alfalfa_batch(&pool, owner).await;
-        let task_id = tasks(&pool, owner, id).await[0].id;
 
-        assert!(
-            list(&pool, other, BatchFilter::default())
-                .await
-                .unwrap()
-                .is_empty()
-        );
-        assert!(matches!(
-            find(&pool, other, id).await,
-            Err(AppError::NotFound)
-        ));
-        assert!(matches!(
-            complete_task(&pool, other, task_id, START).await,
-            Err(AppError::NotFound)
-        ));
-        assert!(matches!(
-            discard(&pool, other, id, START).await,
-            Err(AppError::NotFound)
-        ));
-        assert!(tasks(&pool, other, id).await.is_empty());
+        let listed = list(&pool, BatchFilter::default()).await.unwrap();
+        assert_eq!(listed[0].grower_id, owner);
+        assert_eq!(listed[0].grower, "grower");
+        let task = &tasks(&pool, id).await[0];
+        assert_eq!(task.grower_id, owner);
+        assert_eq!(task.grower, "grower");
     }
 
     #[sqlx::test]
     async fn discarding_stops_the_batch(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
         let id = alfalfa_batch(&pool, user_id).await;
-        let task_id = tasks(&pool, user_id, id).await[0].id;
+        let task_id = tasks(&pool, id).await[0].id;
 
-        discard(&pool, user_id, id, datetime!(2026-10-05 10:00 UTC))
+        discard(&pool, id, datetime!(2026-10-05 10:00 UTC))
             .await
             .unwrap();
 
-        let detail = find(&pool, user_id, id).await.unwrap();
+        let detail = find(&pool, id).await.unwrap();
         assert_eq!(detail.batch.status, BatchStatus::Discarded);
         assert!(detail.open_tasks.is_empty());
         assert!(matches!(
-            discard(&pool, user_id, id, START).await,
+            discard(&pool, id, START).await,
             Err(AppError::Conflict("batch_not_active"))
         ));
         // The deleted task is gone, so completing it finds nothing.
         assert!(matches!(
-            complete_task(&pool, user_id, task_id, START).await,
+            complete_task(&pool, task_id, START).await,
             Err(AppError::NotFound)
         ));
 
@@ -837,12 +818,12 @@ mod tests {
             status: Some(BatchStatus::Active),
             ..Default::default()
         };
-        assert!(list(&pool, user_id, active).await.unwrap().is_empty());
+        assert!(list(&pool, active).await.unwrap().is_empty());
         let discarded = BatchFilter {
             status: Some(BatchStatus::Discarded),
             ..Default::default()
         };
-        assert_eq!(list(&pool, user_id, discarded).await.unwrap().len(), 1);
+        assert_eq!(list(&pool, discarded).await.unwrap().len(), 1);
     }
 
     #[sqlx::test]
@@ -870,7 +851,7 @@ mod tests {
         ));
 
         // Discarding frees it.
-        discard(&pool, grower, first, START).await.unwrap();
+        discard(&pool, first, START).await.unwrap();
         create(&pool, neighbour, alfalfa(jar_1)).await.unwrap();
     }
 
@@ -902,28 +883,27 @@ mod tests {
         let jar_2 = jar(&pool, grower, "jar 2").await;
 
         let old = create(&pool, grower, alfalfa(jar_1)).await.unwrap();
-        discard(&pool, grower, old, START).await.unwrap();
+        discard(&pool, old, START).await.unwrap();
         let current = create(&pool, grower, alfalfa(jar_1)).await.unwrap();
-        create(&pool, neighbour, alfalfa(jar_2)).await.unwrap();
+        let neighbours = create(&pool, neighbour, alfalfa(jar_2)).await.unwrap();
 
         let in_jar_1 = BatchFilter {
             container_id: Some(jar_1),
             ..Default::default()
         };
-        let history = list(&pool, grower, in_jar_1).await.unwrap();
+        let history = list(&pool, in_jar_1).await.unwrap();
         assert_eq!(history.len(), 2);
         assert!(history.iter().all(|batch| batch.container == "jar 1"));
 
-        let all = containers::list(&pool, grower).await.unwrap();
+        let all = containers::list(&pool).await.unwrap();
         let mine = all.iter().find(|container| container.id == jar_1).unwrap();
         assert_eq!(mine.batch_count, 2);
-        assert_eq!(mine.occupant.as_ref().unwrap().batch_id, Some(current));
+        assert_eq!(mine.occupant.as_ref().unwrap().batch_id, current);
 
-        // The neighbour's batch shows who grows it, but not its id.
         let theirs = all.iter().find(|container| container.id == jar_2).unwrap();
         let occupant = theirs.occupant.as_ref().unwrap();
         assert_eq!(occupant.grower, "neighbour");
-        assert_eq!(occupant.batch_id, None);
+        assert_eq!(occupant.batch_id, neighbours);
 
         // Containers with history can't be deleted.
         assert!(matches!(
@@ -936,10 +916,11 @@ mod tests {
     async fn snoozing_moves_a_task_and_resets_its_reminder(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
         let id = alfalfa_batch(&pool, user_id).await;
-        let task = &tasks(&pool, user_id, id).await[0];
+        let task = &tasks(&pool, id).await[0];
         sqlx::query!(
-            "UPDATE tasks SET notified_at = $2 WHERE id = $1",
+            "INSERT INTO task_notifications (task_id, user_id, notified_at) VALUES ($1, $2, $3)",
             task.id,
+            user_id,
             START
         )
         .execute(&pool)
@@ -948,57 +929,52 @@ mod tests {
 
         let now = datetime!(2026-10-05 16:30 UTC);
         let until = datetime!(2026-10-05 18:00 UTC);
-        snooze_task(&pool, user_id, task.id, until, now)
-            .await
-            .unwrap();
+        snooze_task(&pool, task.id, until, now).await.unwrap();
 
-        let snoozed = &tasks(&pool, user_id, id).await[0];
+        let snoozed = &tasks(&pool, id).await[0];
         assert_eq!(snoozed.due_at, until);
         assert_eq!(snoozed.snoozed_until, Some(until));
-        let notified = sqlx::query_scalar!("SELECT notified_at FROM tasks WHERE id = $1", task.id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-        assert_eq!(notified, None);
+        let notified = sqlx::query_scalar!(
+            r#"SELECT count(*) AS "count!" FROM task_notifications WHERE task_id = $1"#,
+            task.id
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(notified, 0);
 
-        let past = snooze_task(&pool, user_id, task.id, now, now).await;
+        let past = snooze_task(&pool, task.id, now, now).await;
         assert!(matches!(past, Err(AppError::Invalid(_))));
-        let too_far =
-            snooze_task(&pool, user_id, task.id, now + time::Duration::days(8), now).await;
+        let too_far = snooze_task(&pool, task.id, now + time::Duration::days(8), now).await;
         assert!(matches!(too_far, Err(AppError::Invalid(_))));
-        let other = user(&pool, "neighbour").await;
-        assert!(matches!(
-            snooze_task(&pool, other, task.id, until, now).await,
-            Err(AppError::NotFound)
-        ));
     }
 
     #[sqlx::test]
     async fn late_ticks_keep_their_time_but_not_before_the_step(pool: PgPool) {
         let user_id = user(&pool, "grower").await;
         let id = alfalfa_batch(&pool, user_id).await;
-        let drain = tasks(&pool, user_id, id).await[0].id;
-        complete_task(&pool, user_id, drain, datetime!(2026-10-05 18:00 UTC))
+        let drain = tasks(&pool, id).await[0].id;
+        complete_task(&pool, drain, datetime!(2026-10-05 18:00 UTC))
             .await
             .unwrap();
 
         // A rinse done offline at 19:00 schedules the next one from 19:00.
-        let rinse = tasks(&pool, user_id, id).await[0].id;
-        complete_task(&pool, user_id, rinse, datetime!(2026-10-05 19:00 UTC))
+        let rinse = tasks(&pool, id).await[0].id;
+        complete_task(&pool, rinse, datetime!(2026-10-05 19:00 UTC))
             .await
             .unwrap();
         assert_eq!(
-            tasks(&pool, user_id, id).await[0].due_at,
+            tasks(&pool, id).await[0].due_at,
             datetime!(2026-10-06 07:00 UTC)
         );
 
         // A time before the step began counts as its start.
-        let next = tasks(&pool, user_id, id).await[0].id;
-        complete_task(&pool, user_id, next, datetime!(2026-10-05 10:00 UTC))
+        let next = tasks(&pool, id).await[0].id;
+        complete_task(&pool, next, datetime!(2026-10-05 10:00 UTC))
             .await
             .unwrap();
         assert_eq!(
-            tasks(&pool, user_id, id).await[0].due_at,
+            tasks(&pool, id).await[0].due_at,
             datetime!(2026-10-06 06:00 UTC)
         );
     }

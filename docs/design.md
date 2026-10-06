@@ -86,13 +86,16 @@ either is out of date.
 The server sends Web Push messages signed with a VAPID key from `VAPID_PRIVATE_KEY`. Without it,
 push stays off and the rest of the app works the same. `mise run vapid:key` prints a new key.
 
-A job in the server process runs every minute. In one transaction it claims open tasks on active
-batches that are due (counting snoozes) and not yet notified, using `FOR UPDATE SKIP LOCKED`. It
-skips people inside their quiet hours, which use their timezone and may run past midnight, and marks
-the rest as notified. Then it sends each person one message for all of their due tasks: one task
-names the step and opens its batch, several become a list that opens today. A push service answering
-404 or 410 removes the subscription. Tasks count as notified even for people without devices, so
-turning push on later doesn't replay old reminders. Snoozing clears the notified mark.
+Everyone gets reminders for every batch, because anyone can tend any batch. A job in the server
+process runs every minute. In one transaction it claims open tasks on active batches that are due
+(counting snoozes), paired with each person who hasn't been notified about them yet, using
+`FOR UPDATE SKIP LOCKED`. It skips people inside their quiet hours, which use their timezone and may
+run past midnight, and records the rest in `task_notifications`. So someone in quiet hours still
+gets the reminder when those end, unless the task is done by then. Then it sends each person one
+message for all of their due tasks: one task names the step and opens its batch, several become a
+list that opens today. A push service answering 404 or 410 removes the subscription. Tasks count as
+notified even for people without devices, so turning push on later doesn't replay old reminders.
+Snoozing clears the task's notifications, so everyone gets it again when the snooze ends.
 
 The service worker (`web/src/sw.ts`) precaches the app, shows pushed messages, and opens the right
 page when one is tapped. Push needs a secure context, so it works on localhost and over https, but
@@ -165,6 +168,10 @@ When it's back online, it gets a 401, sends the user through login, and then rep
 `OIDC_ALLOWED_GROUP` is optional. If set, the callback rejects users whose `groups` claim doesn't
 contain it. Without it, anyone the provider authenticates gets an account.
 
+Every signed-in user can see and change every batch, task, and harvest, and the stats cover
+everyone's batches. A batch records who started it, and the app shows that name on batches that
+aren't yours.
+
 Handlers get the signed-in user from the `AuthUser` extractor, which reads the session cookie. API
 tokens and bearer tokens on the roadmap only add code inside it.
 
@@ -183,11 +190,13 @@ Batch          (id, user, plant_slug, plant jsonb, current_step, container_id, s
                 started_at, status, notes)
 BatchStep      (batch, step_index, started_at, ended_at?)
 Task           (id, batch, step_index, kind: advance|care, action, due_at, overdue_at?,
-                snoozed_until?, done_at?, notified_at?)
+                snoozed_until?, done_at?)
+TaskNotification (task, user, notified_at)
 Harvest        (id, batch, harvested_at, yield_g, rating, notes)
 ```
 
-Custom plants and containers are shared by every account on the server. A container holds one active
+Custom plants, containers, and batches are shared by every account on the server. `Batch.user` is
+who started it. A container holds one active
 batch at a time, which a partial unique index enforces. Containers with past batches get archived
 instead of deleted, so history keeps its jar. A batch stores a copy of its plant's definition from
 when it started, so editing a plant only affects new batches. `BatchStep` records how long each step
