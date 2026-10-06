@@ -80,13 +80,14 @@ run = "sqlx database reset -y"
 [tasks."sqlx:prepare"]
 description = "Write query metadata to server/.sqlx so builds work without a database"
 dir = "server"
-run = "cargo sqlx prepare"
+# --all-targets includes queries in tests, which CI also builds offline.
+run = "cargo sqlx prepare -- --all-targets"
 
 [tasks."check:sqlx"]
 description = "Fail if server/.sqlx doesn't match the queries. Migrates the database at DATABASE_URL first."
 dir = "server"
 env = { SQLX_OFFLINE = "false" }
-run = ["sqlx migrate run", "cargo sqlx prepare --check"]
+run = ["sqlx migrate run", "cargo sqlx prepare --check -- --all-targets"]
 
 [tasks."image:build"]
 description = "Build the production container image as baby-greens:local"
