@@ -152,6 +152,14 @@ run = [
   "server/target/debug/baby-greens-server",
 ]
 
+[tasks.screenshots]
+description = "Retake the README screenshots in docs/screenshots from demo data. Needs `mise run up`."
+depends = ["build:web"]
+run = [
+  "cargo build -q --manifest-path server/Cargo.toml",
+  "bun web/scripts/screenshots.ts",
+]
+
 [tasks."test:e2e:install"]
 description = "Download the browser the end-to-end tests use"
 dir = "web"

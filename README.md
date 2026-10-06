@@ -7,6 +7,15 @@ sends a reminder when a task is due, and records how each batch turned out. It i
 desktop and phones, talks to a self-hosted Rust server, and signs you in through your own OIDC
 provider.
 
+<!-- rumdl-disable no-inline-html -->
+<p>
+  <img src="docs/screenshots/today.png" alt="The today view on a phone, with three chores due and the batches growing" width="32%">
+  <img src="docs/screenshots/batch.png" alt="A mung bean batch on a phone, with its harvest window, supplier links, and next chores" width="32%">
+  <img src="docs/screenshots/plants.png" alt="The plant library on a phone" width="32%">
+</p>
+<img src="docs/screenshots/desktop-dark.png" alt="The today view on a desktop in dark mode">
+<!-- rumdl-enable no-inline-html -->
+
 ## Features
 
 - A plant library of 15 built-in plants. Each plant is a JSON definition of steps (soak, sprout,
@@ -109,6 +118,9 @@ notifier.
 
 To run the browser tests against the container image instead, start it on `localhost:3100` and run
 them with `E2E_EXTERNAL_SERVER=1`. `mise run image:build` builds the image as `baby-greens:local`.
+
+`mise run screenshots` retakes the pictures at the top of this file. It fills a throwaway database
+with demo jars and batches, so your dev data stays out of them. It needs Postgres and Dex up.
 
 Run `mise tasks` to list the other tasks, such as `check`, `test`, `migrate:add`, and `db:reset`.
 
