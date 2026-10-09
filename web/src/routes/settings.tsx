@@ -336,8 +336,11 @@ function Account({ me }: { me: Me }) {
     onSuccess: async () => {
       // Waiting changes belong to this account, so they mustn't go out after someone else signs in.
       await clearOutbox()
-      queryClient.clear()
+      // Signed out first, which the app sees, so the pages showing this account's data unmount.
+      // Clearing the whole cache instead would drop the query without telling anyone, and the page
+      // would stay as it was until a reload.
       queryClient.setQueryData(meQuery.queryKey, null)
+      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== meQuery.queryKey[0] })
     },
   })
 
