@@ -19,6 +19,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       injectRegister: false,
+      // Reload open pages once a new version takes over. Its precache drops the old build's
+      // chunks, so a page still running the old build would fail to open its next route.
+      registerType: 'autoUpdate',
       manifest: {
         name: 'baby greens',
         short_name: 'baby greens',

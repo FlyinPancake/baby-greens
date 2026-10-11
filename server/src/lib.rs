@@ -11,10 +11,15 @@ pub mod notify;
 
 use std::sync::Arc;
 
-use axum::{Router, middleware};
+use axum::{
+    Router,
+    http::{HeaderValue, header},
+    middleware,
+};
 use sqlx::PgPool;
 use tower_http::{
     services::{ServeDir, ServeFile},
+    set_header::SetResponseHeader,
     trace::TraceLayer,
 };
 use tower_sessions::{Expiry, SessionManagerLayer, cookie::SameSite};
@@ -52,10 +57,23 @@ pub fn app(state: AppState, session_store: PostgresStore, config: &Config) -> Ro
         ))
         .layer(sessions);
 
-    // Unknown paths fall back to index.html so client-side routes survive a reload.
     if let Some(dist) = &config.web_dist {
-        let spa = ServeDir::new(dist).fallback(ServeFile::new(dist.join("index.html")));
-        app = app.fallback_service(spa);
+        // Built assets have a hash in their names, so they never change. A missing one is a 404,
+        // not index.html: a page from the previous build asking for its old chunks must fail as
+        // a failed load, which the app answers by reloading, not get HTML parsed as JavaScript.
+        let assets = SetResponseHeader::overriding(
+            ServeDir::new(dist.join("assets")),
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=31536000, immutable"),
+        );
+        // Everything else keeps its name across builds, so browsers check for a new copy each time.
+        // Unknown paths fall back to index.html so client-side routes survive a reload.
+        let spa = SetResponseHeader::overriding(
+            ServeDir::new(dist).fallback(ServeFile::new(dist.join("index.html"))),
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-cache"),
+        );
+        app = app.nest_service("/assets", assets).fallback_service(spa);
     }
 
     app.layer(TraceLayer::new_for_http()).with_state(state)

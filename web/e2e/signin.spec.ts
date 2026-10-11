@@ -29,3 +29,17 @@ test('signing out shows the sign-in screen right away', async ({ page }) => {
   await page.reload()
   await expect(page.getByRole('heading', { name: /Grow tiny greens/ })).toBeVisible()
 })
+
+test('the app shell is revalidated and missing assets are a 404', async ({ request }) => {
+  const shell = await request.get('/plants')
+  expect(shell.headers()['cache-control']).toBe('no-cache')
+  const script = (await shell.text()).match(/src="(\/assets\/[^"]+\.js)"/)![1]
+
+  const asset = await request.get(script)
+  expect(asset.ok()).toBe(true)
+  expect(asset.headers()['cache-control']).toContain('immutable')
+
+  // What a page from the previous build asks for after an update. It must not get index.html.
+  const gone = await request.get('/assets/index-gone1234.js')
+  expect(gone.status()).toBe(404)
+})
