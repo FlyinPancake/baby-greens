@@ -1,6 +1,6 @@
 import { type QueryClient, useQuery } from '@tanstack/react-query'
 import { createRootRouteWithContext, Link, Outlet, useSearch } from '@tanstack/react-router'
-import { CalendarCheck, Container, type LucideIcon, Settings, Sprout } from 'lucide-react'
+import { CalendarCheck, CalendarRange, Container, type LucideIcon, Settings, Sprout } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { SyncBanner } from '@/components/SyncBanner'
@@ -31,6 +31,9 @@ function RootLayout() {
               <nav className="flex gap-2">
                 <NavLink to="/" icon={CalendarCheck}>
                   Today
+                </NavLink>
+                <NavLink to="/calendar" icon={CalendarRange}>
+                  Calendar
                 </NavLink>
                 <NavLink to="/plants" icon={Sprout}>
                   Plants
@@ -63,13 +66,13 @@ function RootLayout() {
   )
 }
 
-/** A header link. Phones show only the icon, so all four fit at 320 px. */
+/** A header link. Phones show only the icon, so all five fit at 320 px. */
 function NavLink({
   to,
   icon: Icon,
   children,
 }: {
-  to: '/' | '/plants' | '/containers' | '/settings'
+  to: '/' | '/calendar' | '/plants' | '/containers' | '/settings'
   icon: LucideIcon
   children: ReactNode
 }) {

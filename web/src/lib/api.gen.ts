@@ -75,6 +75,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the batches that were growing between `from` and `to`, with their step history and, for
+         *     active batches, the planned steps up to harvest. Oldest first.
+         */
+        get: operations["calendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/containers": {
         parameters: {
             query?: never;
@@ -360,6 +380,14 @@ export interface components {
             status: components["schemas"]["BatchStatus"];
             /** Format: date-time */
             step_started_at: string;
+        };
+        /** @description A batch with everything the calendar needs to draw its steps. */
+        CalendarBatch: {
+            batch: components["schemas"]["BatchSummary"];
+            /** @description The steps the batch has been in, with actual times. */
+            steps: components["schemas"]["StepRecord"][];
+            /** @description Planned windows from the current step to harvest. Empty unless the batch is active. */
+            upcoming: components["schemas"]["StepWindow"][];
         };
         Care: {
             action: components["schemas"]["CareAction"];
@@ -915,6 +943,55 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    calendar: {
+        parameters: {
+            query: {
+                /** @description The start of the range. */
+                from: string;
+                /** @description The end of the range, at most 93 days after `from`. */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarBatch"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description `to` isn't after `from`, or the range is too long */
             422: {
                 headers: {
                     [name: string]: unknown;

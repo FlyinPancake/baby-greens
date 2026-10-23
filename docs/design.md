@@ -60,6 +60,7 @@ The JSON API lives under `/api/v1`, so a future native app can stay on `v1` whil
 | GET, POST | `/batches` | List batches (optionally by status or container), or start one |
 | GET | `/batches/{id}` | A batch with its step history, upcoming windows, and open tasks |
 | POST | `/batches/{id}/discard` | Stop an active batch |
+| GET | `/calendar?from=&to=` | Batches that grew in the range, up to 93 days, with step history and planned steps |
 | GET, POST | `/containers` | List the household's jars and trays with what grows in them, or add one |
 | GET, PATCH, DELETE | `/containers/{id}` | Read, rename, archive, or restore one. DELETE only works without history |
 | GET | `/tasks?due_before=` | Open tasks on active batches, soonest first |

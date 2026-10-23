@@ -1,6 +1,8 @@
 //! Batches and their tasks. The functions that change a batch run in a transaction and apply the
 //! rules from `domain::schedule`.
 
+use std::collections::HashMap;
+
 use anyhow::{Context, anyhow};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, types::Json};
@@ -74,6 +76,16 @@ pub struct BatchDetail {
     pub open_tasks: Vec<TaskView>,
     /// Logged harvests, oldest first.
     pub harvests: Vec<super::harvests::Harvest>,
+}
+
+/// A batch with everything the calendar needs to draw its steps.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CalendarBatch {
+    pub batch: BatchSummary,
+    /// The steps the batch has been in, with actual times.
+    pub steps: Vec<StepRecord>,
+    /// Planned windows from the current step to harvest. Empty unless the batch is active.
+    pub upcoming: Vec<StepWindow>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -244,20 +256,7 @@ pub async fn find(pool: &PgPool, id: Uuid) -> Result<BatchDetail, AppError> {
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|step| {
-        let step_index = index(step.step_index)?;
-        let action = plant
-            .steps
-            .get(step_index)
-            .with_context(|| format!("batch {id} has an unknown step {step_index}"))?
-            .action;
-        Ok(StepRecord {
-            step_index,
-            action,
-            started_at: step.started_at,
-            ended_at: step.ended_at,
-        })
-    })
+    .map(|step| step_record(&plant, id, step.step_index, step.started_at, step.ended_at))
     .collect::<Result<Vec<_>, AppError>>()?;
 
     let upcoming = if summary.status == BatchStatus::Active {
@@ -278,6 +277,103 @@ pub async fn find(pool: &PgPool, id: Uuid) -> Result<BatchDetail, AppError> {
         open_tasks,
         harvests,
     })
+}
+
+fn step_record(
+    plant: &Plant,
+    batch_id: Uuid,
+    step_index: i32,
+    started_at: OffsetDateTime,
+    ended_at: Option<OffsetDateTime>,
+) -> Result<StepRecord, AppError> {
+    let step_index = index(step_index)?;
+    let action = plant
+        .steps
+        .get(step_index)
+        .with_context(|| format!("batch {batch_id} has an unknown step {step_index}"))?
+        .action;
+    Ok(StepRecord {
+        step_index,
+        action,
+        started_at,
+        ended_at,
+    })
+}
+
+/// Batches that were growing at some point between `from` and `to`, oldest first. Active batches
+/// count until harvest, so their planned steps can show in future weeks.
+pub async fn calendar(
+    pool: &PgPool,
+    from: OffsetDateTime,
+    to: OffsetDateTime,
+) -> Result<Vec<CalendarBatch>, AppError> {
+    let rows = sqlx::query_as!(
+        BatchRow,
+        r#"
+        SELECT b.id, b.user_id AS grower_id, u.display_name AS grower, b.plant_slug,
+               b.plant AS "plant: Json<Plant>", b.container_id,
+               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS "status: BatchStatus",
+               b.current_step, b.notes, s.started_at AS step_started_at
+        FROM batches b
+        JOIN containers c ON c.id = b.container_id
+        JOIN users u ON u.id = b.user_id
+        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step
+        WHERE b.started_at < $2
+          AND (b.status = 'active' OR COALESCE(s.ended_at, s.started_at) >= $1)
+        ORDER BY b.started_at
+        "#,
+        from,
+        to,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+    let mut steps: HashMap<Uuid, Vec<_>> = HashMap::new();
+    for step in sqlx::query!(
+        r#"
+        SELECT batch_id, step_index, started_at, ended_at FROM batch_steps
+        WHERE batch_id = ANY($1)
+        ORDER BY batch_id, step_index
+        "#,
+        &ids,
+    )
+    .fetch_all(pool)
+    .await?
+    {
+        steps.entry(step.batch_id).or_default().push(step);
+    }
+
+    rows.iter()
+        .map(|row| {
+            let summary = row.summary()?;
+            let plant = &row.plant.0;
+            let steps = steps
+                .remove(&row.id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|step| {
+                    step_record(
+                        plant,
+                        row.id,
+                        step.step_index,
+                        step.started_at,
+                        step.ended_at,
+                    )
+                })
+                .collect::<Result<Vec<_>, AppError>>()?;
+            let upcoming = if summary.status == BatchStatus::Active {
+                schedule::timeline(plant, summary.current_step, summary.step_started_at)
+            } else {
+                Vec::new()
+            };
+            Ok(CalendarBatch {
+                batch: summary,
+                steps,
+                upcoming,
+            })
+        })
+        .collect()
 }
 
 /// Open tasks on active batches, soonest first. `due_before` limits them by when
@@ -824,6 +920,53 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(list(&pool, discarded).await.unwrap().len(), 1);
+    }
+
+    #[sqlx::test]
+    async fn the_calendar_shows_batches_that_overlap_the_range(pool: PgPool) {
+        let user_id = user(&pool, "grower").await;
+        let growing = alfalfa_batch(&pool, user_id).await;
+        let stopped = alfalfa_batch(&pool, user_id).await;
+        discard(&pool, stopped, datetime!(2026-10-05 10:00 UTC))
+            .await
+            .unwrap();
+
+        let ids = |batches: Vec<CalendarBatch>| -> Vec<Uuid> {
+            batches.into_iter().map(|entry| entry.batch.id).collect()
+        };
+
+        // Both batches started on Oct 5.
+        let october = calendar(
+            &pool,
+            datetime!(2026-10-01 0:00 UTC),
+            datetime!(2026-11-01 0:00 UTC),
+        );
+        let october = october.await.unwrap();
+        assert_eq!(october.len(), 2);
+        let entry = october
+            .iter()
+            .find(|entry| entry.batch.id == growing)
+            .unwrap();
+        assert_eq!(entry.steps.len(), 1);
+        assert_eq!(entry.steps[0].started_at, START);
+        assert_eq!(entry.upcoming.len(), 3);
+        let stopped_entry = october
+            .iter()
+            .find(|entry| entry.batch.id == stopped)
+            .unwrap();
+        assert!(stopped_entry.upcoming.is_empty());
+
+        // Nothing had started yet.
+        let before = calendar(&pool, datetime!(2026-09-01 0:00 UTC), START);
+        assert!(before.await.unwrap().is_empty());
+
+        // The discarded batch ended on Oct 5, but the active one keeps growing.
+        let later = calendar(
+            &pool,
+            datetime!(2026-10-06 0:00 UTC),
+            datetime!(2026-10-13 0:00 UTC),
+        );
+        assert_eq!(ids(later.await.unwrap()), [growing]);
     }
 
     #[sqlx::test]

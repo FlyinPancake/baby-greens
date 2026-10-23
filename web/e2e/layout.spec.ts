@@ -53,6 +53,7 @@ async function expectNoZoom(page: Page) {
 
 const pages = [
   { path: '/', ready: 'Growing' },
+  { path: '/calendar', ready: 'Planned steps assume' },
   { path: '/plants', ready: 'Add your own plant' },
   { path: '/plants/pea-shoots', ready: 'Basics' },
   { path: '/plants/e2e-new-plant', ready: 'This slug is free' },

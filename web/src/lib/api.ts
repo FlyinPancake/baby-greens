@@ -21,6 +21,7 @@ export type QuietHours = Schemas['QuietHours']
 export type Harvest = Schemas['Harvest']
 export type PlantStats = Schemas['PlantStats']
 export type ContainerKind = Schemas['ContainerKind']
+export type CalendarBatch = Schemas['CalendarBatch']
 
 export const api = createClient<paths>({ baseUrl: '/api/v1' })
 
@@ -114,6 +115,21 @@ export const batchQuery = (id: string) =>
   queryOptions({
     queryKey: ['batches', id],
     queryFn: () => unwrap(api.GET('/batches/{id}', { params: { path: { id } } })),
+  })
+
+/**
+ * Batches that grew between `from` and `to`, with their steps. The key starts with 'batches', so
+ * anything that refreshes batches refreshes the calendar too.
+ */
+export const calendarQuery = (from: Date, to: Date) =>
+  queryOptions({
+    queryKey: ['batches', 'calendar', from.toISOString(), to.toISOString()],
+    queryFn: () =>
+      unwrap(
+        api.GET('/calendar', {
+          params: { query: { from: from.toISOString(), to: to.toISOString() } },
+        }),
+      ),
   })
 
 /** Every open task on active batches, soonest first. */

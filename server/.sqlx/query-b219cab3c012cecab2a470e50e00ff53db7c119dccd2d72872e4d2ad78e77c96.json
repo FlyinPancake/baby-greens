@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT b.id, b.user_id AS grower_id, u.display_name AS grower, b.plant_slug,\n               b.plant AS \"plant: Json<Plant>\", b.container_id,\n               c.name AS container, c.color AS container_color, b.seed_g, b.started_at, b.status AS \"status: BatchStatus\",\n               b.current_step, b.notes, s.started_at AS step_started_at\n        FROM batches b\n        JOIN containers c ON c.id = b.container_id\n        JOIN users u ON u.id = b.user_id\n        JOIN batch_steps s ON s.batch_id = b.id AND s.step_index = b.current_step\n        WHERE b.started_at < $2\n          AND (b.status = 'active' OR COALESCE(s.ended_at, s.started_at) >= $1)\n        ORDER BY b.started_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "grower_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "grower",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "plant_slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "plant: Json<Plant>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "container_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "container",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "container_color",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "seed_g",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "status: BatchStatus",
+        "type_info": {
+          "Custom": {
+            "name": "batch_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "harvested",
+                "discarded"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "current_step",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "step_started_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b219cab3c012cecab2a470e50e00ff53db7c119dccd2d72872e4d2ad78e77c96"
+}
