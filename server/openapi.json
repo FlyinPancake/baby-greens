@@ -345,6 +345,84 @@
         ]
       }
     },
+    "/calendar": {
+      "get": {
+        "tags": [
+          "batches"
+        ],
+        "summary": "List the batches that were growing between `from` and `to`, with their step history and, for\nactive batches, the planned steps up to harvest. Oldest first.",
+        "operationId": "calendar",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "The start of the range.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "The end of the range, at most 93 days after `from`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarBatch"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`to` isn't after `from`, or the range is too long",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/containers": {
       "get": {
         "tags": [
@@ -1579,6 +1657,34 @@
           "step_started_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "CalendarBatch": {
+        "type": "object",
+        "description": "A batch with everything the calendar needs to draw its steps.",
+        "required": [
+          "batch",
+          "steps",
+          "upcoming"
+        ],
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/BatchSummary"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepRecord"
+            },
+            "description": "The steps the batch has been in, with actual times."
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepWindow"
+            },
+            "description": "Planned windows from the current step to harvest. Empty unless the batch is active."
           }
         }
       },

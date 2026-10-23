@@ -24,6 +24,8 @@ provider.
 - Batches with a plant, seed weight, container, and start time. You move a batch from step to step,
   and the server schedules the chores for the current step.
 - A today view of everything due across all batches.
+- A month calendar with a bar per batch, coloured by step. Past steps use their real times, and
+  coming steps and the harvest window are striped.
 - Sharing. Everyone who can sign in sees and tends every batch, and the app shows who started each
   one.
 - Web push reminders for everyone, with snoozing and quiet hours per person.

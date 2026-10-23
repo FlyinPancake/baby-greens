@@ -74,3 +74,13 @@ void startOutbox()
 
 // Installs the service worker, which keeps the app working offline and shows reminders.
 registerSW({ immediate: true })
+
+// A page from an older build asks for chunks the server no longer has. Reload to get the new
+// build, but at most once a minute, so a chunk that's missing for another reason can't loop.
+window.addEventListener('vite:preloadError', (event) => {
+  const last = Number(sessionStorage.getItem('chunk-reload') ?? 0)
+  if (Date.now() - last < 60_000) return
+  sessionStorage.setItem('chunk-reload', String(Date.now()))
+  event.preventDefault()
+  window.location.reload()
+})
