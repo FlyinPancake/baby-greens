@@ -21,6 +21,10 @@ test('the calendar shows a growing batch and opens it', async ({ page }, testInf
   await page.getByRole('button', { name: 'Today' }).click()
   await expect(page.getByRole('heading', { level: 2 })).toHaveText(month!)
 
+  // A month that doesn't exist shows this one instead of rolling over into next year.
+  await page.goto('/calendar?month=2026-13')
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(month!)
+
   await cleanUp(page, batchId, jar)
   await deleteTestPlant(page, plant)
 })

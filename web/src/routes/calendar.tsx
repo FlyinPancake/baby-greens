@@ -17,7 +17,7 @@ export const Route = createFileRoute('/calendar')({
   component: Calendar,
   validateSearch: (search: Record<string, unknown>): Search => ({
     month:
-      typeof search.month === 'string' && /^\d{4}-\d{2}$/.test(search.month)
+      typeof search.month === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(search.month)
         ? search.month
         : undefined,
   }),
