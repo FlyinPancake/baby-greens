@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use axum::{
     Router,
-    http::{HeaderValue, header},
+    http::{HeaderValue, Response, header},
     middleware,
 };
 use sqlx::PgPool;
@@ -61,10 +61,19 @@ pub fn app(state: AppState, session_store: PostgresStore, config: &Config) -> Ro
         // Built assets have a hash in their names, so they never change. A missing one is a 404,
         // not index.html: a page from the previous build asking for its old chunks must fail as
         // a failed load, which the app answers by reloading, not get HTML parsed as JavaScript.
+        // The 404 isn't stored, because rolling back to the previous image brings the file back.
         let assets = SetResponseHeader::overriding(
             ServeDir::new(dist.join("assets")),
             header::CACHE_CONTROL,
-            HeaderValue::from_static("public, max-age=31536000, immutable"),
+            |response: &Response<_>| {
+                Some(HeaderValue::from_static(
+                    if response.status().is_success() {
+                        "public, max-age=31536000, immutable"
+                    } else {
+                        "no-store"
+                    },
+                ))
+            },
         );
         // Everything else keeps its name across builds, so browsers check for a new copy each time.
         // Unknown paths fall back to index.html so client-side routes survive a reload.

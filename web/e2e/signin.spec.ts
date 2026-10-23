@@ -42,4 +42,5 @@ test('the app shell is revalidated and missing assets are a 404', async ({ reque
   // What a page from the previous build asks for after an update. It must not get index.html.
   const gone = await request.get('/assets/index-gone1234.js')
   expect(gone.status()).toBe(404)
+  expect(gone.headers()['cache-control']).toBe('no-store')
 })
