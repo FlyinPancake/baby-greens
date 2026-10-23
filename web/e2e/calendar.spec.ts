@@ -11,6 +11,7 @@ test('the calendar shows a growing batch and opens it', async ({ page }, testInf
   await expect(page.getByText('Planned steps assume')).toBeVisible()
   // A batch that runs into next week has a bar in each week, so take the first.
   await page.getByRole('link', { name: `${plant.name} in ${jar}` }).first().click()
+  await expect(page).toHaveURL(new RegExp(`/batches/${batchId}$`))
   await expect(page.getByRole('heading', { name: plant.name })).toBeVisible()
 
   // The month buttons move between months and back to this one.

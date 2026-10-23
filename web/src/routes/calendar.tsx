@@ -116,7 +116,7 @@ function Calendar() {
       {batches.isPending ? (
         <p className="font-heading">Loading...</p>
       ) : (
-        timelines.length === 0 && <p>Nothing grew this month.</p>
+        batches.isSuccess && timelines.length === 0 && <p>Nothing grew this month.</p>
       )}
 
       <Legend />
